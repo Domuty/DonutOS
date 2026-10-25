@@ -39,8 +39,14 @@ site's data in your browser (web) / delete `Documents/DonutOS` and the app's dat
 
 ## Deploy the web version
 
-Push to GitHub and import the repo in Vercel — `vercel.json` already configures everything
-(output folder `src`, no install step).
+Push to GitHub and import the repo in Vercel. `vercel.json` already configures everything:
+output folder `src`, no install step, and the small `api/frame-check` function.
+
+That function lets the Browser app tell which websites refuse to be shown inside another page.
+Most big sites refuse, and on the web version the Browser then offers to open them in a new tab
+of your real browser. On static hosts without functions (e.g. GitHub Pages), those sites show a
+blank page with the same "open in browser tab" notice. The desktop version doesn't need any of
+this.
 
 ## Make an app
 

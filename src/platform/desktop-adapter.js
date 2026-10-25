@@ -98,6 +98,8 @@ export function createDesktopAdapter(native = window.donutNative) {
       cancelDownload: (id) => call('browser:cancelDownload', id),
       onOpenRequest: (cb) => native.on('browser:open', cb),
       clearData: (what) => call('browser:clearData', what || {}),
+      // A <webview> is a top-level page of its own, so frame rules don't apply.
+      canEmbed: async () => true,
     },
 
     updates: {

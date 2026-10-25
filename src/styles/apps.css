@@ -867,6 +867,7 @@ button.tm-twisty:hover { background: var(--hover); }
 .br-center { display: grid; place-content: center; justify-items: center; text-align: center; gap: 10px; }
 .br-center p { max-width: 460px; color: var(--text-2); margin: 0; }
 .br-center h1 { margin: 6px 0 0; font: 600 22px var(--font-display); }
+.br-actions { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; margin-top: 6px; }
 .br-newtab { display: flex; flex-direction: column; align-items: center; padding-top: 8vh; }
 .br-logo { font-size: 56px; margin-bottom: 10px; }
 .br-bigsearch { width: min(640px, 100%); height: 46px; border-radius: 23px; font-size: 15px; padding: 0 22px; box-shadow: var(--shadow-s); }

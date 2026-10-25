@@ -83,9 +83,10 @@ export class Search {
     const web = this.settings.get('search.web') ? [wrap({
       group: 'Search the web', score: 1, title: this.input.value.trim(), sub: 'See web results', iconName: 'globe',
       run: async () => {
-        const url = `https://duckduckgo.com/?q=${encodeURIComponent(this.input.value.trim())}`;
-        if (this.kernel.registry.has('browser')) launchApp(this.kernel, 'browser', { url });
-        else this.kernel.platform.host.openExternal(url);
+        const q = this.input.value.trim();
+        // The Browser searches with the engine chosen in its settings.
+        if (this.kernel.registry.has('browser')) launchApp(this.kernel, 'browser', { search: q });
+        else this.kernel.platform.host.openExternal(`https://www.google.com/search?q=${encodeURIComponent(q)}`);
       },
     })] : [];
 

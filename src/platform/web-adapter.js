@@ -13,6 +13,31 @@ const DB_NAME = 'donutos';
 const DB_VERSION = 1;
 const APP_VERSION = '0.1.0';
 
+// Most big sites forbid being shown in a frame (X-Frame-Options / CSP frame-ancestors) and the
+// frame then just stays empty. A page can't see another site's headers, so the server that hosts
+// DonutOS answers: api/frame-check.js on Vercel, scripts/serve.js locally. On hosts without
+// it (GitHub Pages, offline) the answer is null and the Browser tries the frame anyway.
+const frameAnswers = new Map();
+let frameCheckMissing = false;
+async function frameCheck(url) {
+  if (frameCheckMissing || !/^https?:/i.test(url)) return null;
+  const cached = frameAnswers.get(url);
+  if (cached && Date.now() - cached.time < 10 * 60e3) return cached.embeddable;
+  const ctl = new AbortController();
+  const timer = setTimeout(() => ctl.abort(), 7000);
+  try {
+    const api = new URL('api/frame-check', document.baseURI);
+    api.search = new URLSearchParams({ url, origin: location.origin });
+    const res = await fetch(api, { signal: ctl.signal });
+    if (res.status === 404 || !(res.headers.get('content-type') || '').includes('json')) { frameCheckMissing = true; return null; }
+    const { embeddable = null } = await res.json();
+    if (embeddable !== null) frameAnswers.set(url, { embeddable, time: Date.now() });
+    return embeddable;
+  } catch {
+    return null;
+  } finally { clearTimeout(timer); }
+}
+
 export function createWebAdapter({ dbName = DB_NAME } = {}) {
   let db = null;
   let fs = null;
@@ -211,6 +236,7 @@ export function createWebAdapter({ dbName = DB_NAME } = {}) {
       cancelDownload: async () => {},
       onOpenRequest: () => () => {},
       clearData: async () => {},
+      canEmbed: frameCheck,
     },
 
     updates: {

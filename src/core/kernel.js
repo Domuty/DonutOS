@@ -370,6 +370,7 @@ export class Kernel {
         cancelDownload: (id) => b.cancelDownload(id),
         onOpenRequest: (fn) => ctx.own(b.onOpenRequest(proc.wrap(fn))),
         clearData: (what) => b.clearData(what),
+        canEmbed: async (url) => { await need(proc, 'network'); return b.canEmbed(String(url)); },
       });
     });
 

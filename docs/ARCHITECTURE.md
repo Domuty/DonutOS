@@ -54,6 +54,7 @@ Files marked ✅ exist now (phases 1–7). The rest are created in the phase sho
 donutos/
 ├── package.json                 ✅ scripts, Electron + electron-builder config, GitHub publish
 ├── vercel.json                  ✅ static deploy of /src, SW headers, precache build step
+├── api/frame-check.js           ✅ Vercel function: can the Browser show a site in a frame? (logic in api/_lib/)
 ├── README.md                    ✅ (rewritten for beginners in phase 9)
 ├── docs/
 │   ├── ARCHITECTURE.md          ✅ this file
@@ -371,8 +372,14 @@ focus is a timed do-not-disturb.
   websites, turns pop-ups into tabs and saves downloads into the user's Downloads folder. Local
   HTML/SVG files open with an opaque origin so they can never reach DonutOS.
   The web build can't read cross-origin frames: titles show the site name, Back/Forward cover
-  pages opened from DonutOS, Find/Print use the host browser, and sites that forbid framing stay
-  blank (a notice offers to open them in a real browser tab).
+  pages opened from DonutOS, and Find/Print use the host browser.
+  - **Sites that forbid framing.** Most big sites (X-Frame-Options / CSP `frame-ancestors`) would leave an empty frame. Before loading a page, the Browser calls `ctx.browser.canEmbed(url)`.
+    - On the web this asks `api/frame-check` (a Vercel function; `scripts/serve.js` answers locally). It requests the page server-side, reads only its headers, and replies true/false/null.
+    - The check refuses private and loopback addresses, follows at most 5 redirects, and never passes page content back.
+    - `false` shows a "*site* opens in its own tab" page with **Open in a new tab**. `null` (static hosts without the function, or offline) just tries the frame.
+    - Links clicked inside a framed page can't be checked, so a notice covers those.
+    - The default search engine is Google in its embeddable mode (`igu=1`), so searches stay in the window.
+    - The desktop build's `<webview>` is a top-level page, so `canEmbed` is always true there.
 - **Mail** (`core/mail.js`): real delivery between this device's accounts (`name@device.local`),
   stored per user in the key-value store so it reaches people who are signed out. Outside
   addresses are handed to the computer's email app (`mailto:`) — a web page can't log in to

@@ -88,6 +88,7 @@ export const ADAPTER_SHAPE = {
     cancelDownload: 'function',   // async (id) => void
     onOpenRequest: 'function',    // (cb({ url })) => unsubscribe   (a page asked for a new window)
     clearData: 'function',        // async ({ cache, cookies, storage }) => void
+    canEmbed: 'function',         // async (url) => true | false | null  (false: the site refuses to be shown in a frame)
   },
 
   updates: {

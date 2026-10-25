@@ -5,14 +5,17 @@
 import { h, mount } from '../../ui/h.js';
 import { icon } from '../../ui/icons.js';
 import { showMenu } from '../../ui/menu.js';
-import { promptDialog, confirmDialog } from '../../ui/dialog.js';
+import { promptDialog, confirmDialog, alertDialog } from '../../ui/dialog.js';
 import { formatBytes } from '../../core/util.js';
 import * as P from '../../core/path.js';
 
+// Google's igu=1 mode allows its results to be shown inside other pages, so searches stay in
+// the window on the web version too (most other engines refuse to be framed).
+const DEFAULT_ENGINE = 'google';
 const ENGINES = {
+  google: ['Google', 'https://www.google.com/search?igu=1&q='],
   duckduckgo: ['DuckDuckGo', 'https://duckduckgo.com/?q='],
   bing: ['Bing', 'https://www.bing.com/search?q='],
-  google: ['Google', 'https://www.google.com/search?q='],
   startpage: ['Startpage', 'https://www.startpage.com/do/search?q='],
   wikipedia: ['Wikipedia', 'https://en.wikipedia.org/w/index.php?search='],
 };
@@ -33,7 +36,7 @@ export default function main(ctx) {
   let tabSeq = 1;
   let frameNoticeDismissed = store.get('frameNotice', false);
   const downloads = new Map(store.get('downloads', []).map((d) => [d.id, d]));
-  const engine = () => ENGINES[store.get('engine', 'duckduckgo')] || ENGINES.duckduckgo;
+  const engine = () => ENGINES[store.get('engine', DEFAULT_ENGINE)] || ENGINES[DEFAULT_ENGINE];
   const bookmarks = () => store.get('bookmarks', []);
   const history = () => store.get('history', []);
 
@@ -103,7 +106,7 @@ export default function main(ctx) {
         { label: 'New tab', onSelect: () => newTab() }, { label: 'Reload', onSelect: () => reload(t) }, { label: 'Duplicate', onSelect: () => newTab(t.url) },
         { separator: true }, { label: 'Close tab', onSelect: () => closeTab(t) }, { label: 'Close other tabs', onSelect: () => [...tabs].filter((x) => x !== t).forEach(closeTab) },
       ], { x: e.clientX, y: e.clientY }); },
-    }, t.loading ? h('span.br-spin') : t.favicon ? h('img', { src: t.favicon, alt: '', onerror: (e) => e.target.replaceWith(icon('globe', { size: 14 })) }) : icon(t.internal ? 'apps' : 'globe', { size: 14 }),
+    }, t.loading ? h('span.br-spin') : t.favicon ? h('img', { src: t.favicon, alt: '', onerror: (e) => e.target.replaceWith(icon('globe', { size: 14 })) }) : icon(t.internal && t.internal !== 'about:blocked' ? 'apps' : 'globe', { size: 14 }),
     h('span', t.title || t.url),
     h('button.ex-tab-x', { type: 'button', 'aria-label': 'Close tab', onclick: (e) => { e.stopPropagation(); closeTab(t); } }, icon('close', { size: 10 })))),
     h('button.ex-tab-new', { type: 'button', title: 'New tab (Ctrl+T or Alt+T)', 'aria-label': 'New tab', onclick: () => newTab() }, icon('plus', { size: 14 })));
@@ -152,6 +155,16 @@ export default function main(ctx) {
     if (tab.internal && tab.internal !== 'about:offline' && tab.internal !== 'about:error') tab.cameFrom = tab.internal;
     tab.internal = null;
     if (!B.online()) { tab.url = url; showOffline(tab); return; }
+    // Sites that refuse to be shown inside another page get a page of ours instead of an
+    // empty frame (only the web version's frames are affected; the answer is null if unknown).
+    const seq = tab.navSeq = (tab.navSeq || 0) + 1;
+    tab.url = url;
+    tab.loading = true;
+    if (tab === active) { renderChrome(); renderTabs(); }
+    const embeddable = await B.canEmbed(url).catch(() => null);
+    if (tab.navSeq !== seq) return; // the user went somewhere else meanwhile
+    tab.loading = false;
+    if (embeddable === false) { showBlocked(tab, url); return; }
     try {
       if (!tab.view || tab.fileView) await attachView(tab);
     } catch (err) {
@@ -194,12 +207,20 @@ export default function main(ctx) {
 
   // Back goes through the page's history, then to the Browser page the tab started on.
   function goBack(tab) {
+    // From a "can't be shown here" page, back to the page that was showing before.
+    if (tab.internal === 'about:blocked' && tab.view && tab.view.url()) {
+      tab.internal = null; tab.url = tab.view.url(); tab.title = hostOf(tab.url).replace(/^www\./, '');
+      tab.panel.replaceChildren(tab.view.el);
+      if (tab === active) { renderChrome(); renderTabs(); }
+      return;
+    }
+    if (tab.internal === 'about:blocked' && tab.cameFrom) { const to = tab.cameFrom; tab.cameFrom = null; showInternal(tab, to); return; }
     if (tab.view?.canGoBack()) tab.view.back();
     else if (!tab.internal && tab.cameFrom) { const to = tab.cameFrom; tab.cameFrom = null; showInternal(tab, to); }
   }
 
   function reload(tab) {
-    if (tab.internal === 'about:offline') { navigate(tab, tab.url); return; }
+    if (tab.internal === 'about:offline' || tab.internal === 'about:blocked') { navigate(tab, tab.url); return; }
     if (tab.internal) { showInternal(tab, tab.internal); return; }
     tab.view?.reload();
   }
@@ -232,6 +253,24 @@ export default function main(ctx) {
     if (tab === active) { renderChrome(); renderTabs(); }
   }
   const hostOf = (u) => { try { return new URL(u).hostname; } catch { return u; } };
+
+  function showBlocked(tab, url) {
+    const host = hostOf(url).replace(/^www\./, '');
+    tab.internal = 'about:blocked';
+    tab.url = url;
+    tab.title = host;
+    tab.favicon = null;
+    const canBack = !!(tab.view && tab.view.url()) || !!tab.cameFrom;
+    tab.panel.replaceChildren(h('div.br-page.br-center', icon('globe', { size: 44 }),
+      h('h1', `${host} opens in its own tab`),
+      h('p', `${host} doesn’t allow other apps to show it inside them, so it can’t appear in this window. Open it in a new tab of your web browser; DonutOS stays open here.`),
+      h('div.br-actions',
+        h('button.btn.primary', { type: 'button', onclick: () => ctx.host.openExternal(url).catch((err) => alertDialog('Couldn’t open the page', err.message, { parent: win.body })) }, icon('arrowRight', { size: 14 }), 'Open in a new tab'),
+        canBack ? h('button.btn', { type: 'button', onclick: () => goBack(tab) }, 'Go back') : null),
+      h('p.hint', url)));
+    record(tab);
+    if (tab === active) { renderChrome(); renderTabs(); }
+  }
 
   async function openLocal(tab, path) {
     const st = await ctx.fs.stat(path).catch(() => null);
@@ -347,7 +386,7 @@ export default function main(ctx) {
 
   function settingsPage() {
     const sel = h('select.input', { 'aria-label': 'Search engine', onchange: (e) => { store.set('engine', e.target.value); address.placeholder = `Search ${engine()[0]} or type a web address`; } },
-      Object.entries(ENGINES).map(([id, [name]]) => h('option', { value: id, selected: store.get('engine', 'duckduckgo') === id }, name)));
+      Object.entries(ENGINES).map(([id, [name]]) => h('option', { value: id, selected: store.get('engine', DEFAULT_ENGINE) === id }, name)));
     const home = h('input.input', { value: store.get('home', 'about:newtab'), 'aria-label': 'Home page', onchange: (e) => store.set('home', e.target.value.trim() || 'about:newtab') });
     const bar = h('input', { type: 'checkbox', checked: store.get('showBookmarks', true), onchange: (e) => { store.set('showBookmarks', e.target.checked); renderChrome(); } });
     const zoom = h('select.input', { 'aria-label': 'Default zoom', onchange: (e) => store.set('zoom', Number(e.target.value)) }, [0.75, 0.9, 1, 1.1, 1.25, 1.5].map((z) => h('option', { value: z, selected: store.get('zoom', 1) === z }, `${Math.round(z * 100)}%`)));
@@ -461,7 +500,7 @@ export default function main(ctx) {
   function showFind() { if (!active?.view?.capabilities.find) return; findBar.hidden = false; findInput.focus(); findInput.select(); }
   function hideFind() { findBar.hidden = true; active?.view?.stopFind(); findCount.textContent = ''; }
 
-  mount(notice, icon('info', { size: 16 }), h('span', 'Some websites don’t allow being shown inside other apps and stay blank here. Open them in a tab of your web browser instead.'),
+  mount(notice, icon('info', { size: 16 }), h('span', 'If a link inside this page leads to a site that doesn’t allow being shown inside other apps, the page stays blank. Open it in a tab of your web browser instead.'),
     h('button.btn', { type: 'button', onclick: () => ctx.host.openExternal(active.url) }, 'Open in browser tab'),
     h('button.tb-btn', { type: 'button', 'aria-label': 'Dismiss', onclick: () => { frameNoticeDismissed = true; store.set('frameNotice', true); notice.hidden = true; } }, icon('close', { size: 14 })));
 
@@ -509,6 +548,7 @@ export default function main(ctx) {
   function handleArgs(args) {
     if (args?.path) newTab(['.html', '.htm', '.pdf', '.svg'].includes(P.extname(args.path).toLowerCase()) ? `donut-file:${args.path}` : 'about:newtab');
     else if (args?.url) newTab(args.url);
+    else if (typeof args?.search === 'string' && args.search.trim()) newTab(engine()[1] + encodeURIComponent(args.search.trim()));
     else if (!tabs.length) newTab(store.get('home', 'about:newtab'));
   }
   ctx.onActivate(handleArgs);
