@@ -15,7 +15,7 @@ export const BUILTIN_WALLPAPERS = [
 export const SOLID_COLORS = ['#1b1b2f', '#2d1238', '#0f3d3e', '#3b2a1a', '#203a5c', '#5a1f3d', '#e9e4dc', '#c8d6e5'];
 
 const base = new URL('../assets/wallpapers/', import.meta.url);
-const fileUrls = new Map(); // spec -> object URL (cached so switching back is instant)
+const fileUrls = new Map(); // spec -> { url, mtime } (cached so switching back is instant)
 
 export const builtinUrl = (name, thumb = false) => new URL(`${name}${thumb ? '-thumb' : ''}.jpg`, base).href;
 
@@ -23,11 +23,15 @@ export const builtinUrl = (name, thumb = false) => new URL(`${name}${thumb ? '-t
 export async function resolveWallpaper(spec, fs, { thumb = false } = {}) {
   if (spec?.startsWith('color:')) return { color: spec.slice(6), url: null };
   if (spec?.startsWith('file:')) {
-    if (fileUrls.has(spec)) return { url: fileUrls.get(spec) };
     try {
-      const blob = await fs.readBlob(spec.slice(5));
-      const url = URL.createObjectURL(blob);
-      fileUrls.set(spec, url);
+      // Cache by modification time so a replaced image is picked up.
+      const st = await fs.stat(spec.slice(5));
+      if (!st) throw new Error('missing');
+      const cached = fileUrls.get(spec);
+      if (cached?.mtime === st.mtime) return { url: cached.url };
+      if (cached) URL.revokeObjectURL(cached.url);
+      const url = URL.createObjectURL(await fs.readBlob(spec.slice(5)));
+      fileUrls.set(spec, { url, mtime: st.mtime });
       return { url };
     } catch {
       return { url: builtinUrl('glaze', thumb), missing: true };
