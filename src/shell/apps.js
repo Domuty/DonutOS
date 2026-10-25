@@ -75,6 +75,15 @@ export function setPinned(kernel, where, appId, on) {
   kernel.settings.set(`${where}.pinned`, list);
 }
 
+/** Uninstalls a Store app for good: ends it, removes it, and clears its settings, permissions and pins for `uid`. */
+export async function uninstallApp(kernel, appId, uid) {
+  for (const p of kernel.processes.byApp(appId)) await kernel.processes.kill(p.pid, { force: true });
+  await kernel.registry.uninstall(appId);
+  kernel.settings.forUser(uid).resetPrefix(`app.${appId}.`);
+  kernel.permissions.reset(appId, null, uid);
+  for (const where of ['start', 'taskbar']) setPinned(kernel, where, appId, false);
+}
+
 /** Moves `appId` before `beforeId` (or to the end) among the pins. */
 export function movePin(kernel, where, appId, beforeId) {
   const list = kernel.settings.get(`${where}.pinned`).filter((id) => id !== appId);

@@ -48,7 +48,7 @@ Everything above it talks to the adapter interface (`src/platform/adapter.js`), 
 
 ## Folder tree
 
-Files marked ✅ exist now (phases 1–6). The rest are created in the phase shown.
+Files marked ✅ exist now (phases 1–7). The rest are created in the phase shown.
 
 ```
 donutos/
@@ -57,8 +57,7 @@ donutos/
 ├── README.md                    ✅ (rewritten for beginners in phase 9)
 ├── docs/
 │   ├── ARCHITECTURE.md          ✅ this file
-│   ├── SDK.md                   7  app API reference
-│   └── BUILD-AN-APP.md          7  step-by-step guide with an example app
+│   └── SDK.md                   ✅ Store app tutorial, API reference, .dapp and catalog formats
 ├── build/
 │   └── icon.png                 ✅ installer/app icon (electron-builder makes .ico/.icns from it)
 ├── scripts/
@@ -68,7 +67,9 @@ donutos/
 │   ├── build-wallpapers.js      ✅ renders the original wallpapers to JPEG
 │   ├── build-app-icons.js       ✅ generates the app and file-type icons (SVG)
 │   ├── build-emoji.js           ✅ builds the emoji list from emojibase-data (MIT)
-│   └── vendor.js                ✅ copies JSZip into src/vendor
+│   ├── vendor.js                ✅ copies JSZip into src/vendor
+│   ├── build-catalog.js         ✅ src/store/apps/* → src/store/catalog/*.dapp + index.json
+│   └── pack-dapp.js             ✅ packs an app folder into a .dapp (developer CLI)
 ├── .github/workflows/
 │   └── release.yml              9  builds Windows/macOS/Linux installers and publishes a Release
 ├── electron/
@@ -125,7 +126,8 @@ donutos/
     │   ├── accounts.js          ✅ accounts, guest, lockout, admin rules
     │   ├── crypto.js            ✅ PBKDF2-SHA-256 password/PIN hashing (WebCrypto)
     │   ├── clipboard.js         ✅ clipboard history
-    │   └── shortcuts.js         ✅ keyboard shortcut registry (Win-key + Ctrl+Alt alternatives)
+    │   ├── shortcuts.js         ✅ keyboard shortcut registry (Win-key + Ctrl+Alt alternatives)
+    │   └── dapp.js              ✅ .dapp parse/validate/build, version compare
     ├── shell/
     │   ├── shell.js             ✅ screen state machine, sessions, shortcuts, auto-lock
     │   ├── boot-screen.js, lock-screen.js, sign-in.js, oobe.js  ✅
@@ -156,8 +158,12 @@ donutos/
     │   ├── notepad/ writer/ calculator/ paint/ photos/ mediaplayer/           ✅
     │   ├── camera/ recorder/ clock/ calendar/ stickynotes/ browser/ mail/     ✅
     │   ├── solitaire/ minesweeper/                                            ✅
-    │   └── store/               7  catalog in store/catalog/*.dapp
-    ├── sdk/                     7  donut-sdk.js (typed helpers over ctx), example app
+    │   └── store/               ✅ the Store: browse, install, update, uninstall, sources
+    ├── sandbox/host.js          ✅ runs a Store app in a sandboxed frame; answers its SDK calls through ctx
+    ├── sdk/                     ✅ donut-sdk.js (the `@donut/sdk` module inside the frame), sdk.css
+    ├── store/
+    │   ├── apps/                ✅ sources of the 8 catalog apps (not precached; built into catalog/)
+    │   └── catalog/             ✅ generated: index.json + <id>.dapp
     └── tests/                   ✅ core test suite (runs on whichever platform is active)
 ```
 
@@ -371,6 +377,35 @@ focus is a timed do-not-disturb.
   stored per user in the key-value store so it reaches people who are signed out. Outside
   addresses are handed to the computer's email app (`mailto:`) — a web page can't log in to
   IMAP/SMTP servers. `.eml` import/export (`apps/mail/eml.js`, MIME + base64/quoted-printable).
+
+## Store and SDK (phase 7)
+
+- **Two kinds of apps.** Built-in apps (`apps/index.js`) are trusted modules that run in
+  DonutOS's page with a `ctx`. Store apps are a manifest plus a `source` string; the registry marks
+  them `sandboxed`, never `privileged`, and `validateManifest` only lets them declare
+  `SANDBOX_PERMISSIONS` (files, system.fs, network, notifications, clipboard, location).
+- **Sandbox** (`sandbox/host.js`). The process manager runs a sandboxed app through
+  `sandboxModule(app)`. This makes a normal window whose body is an
+  `<iframe sandbox="allow-scripts allow-forms allow-pointer-lock" srcdoc>`, so the frame has an
+  opaque origin, with a CSP that blocks every network fetch (`default-src 'none'`, only inline/data:/blob:).
+  - An import map points `@donut/sdk` at a data: URL of `sdk/donut-sdk.js`, and the app's source is imported as a data: URL.
+  - The SDK talks to the host with `postMessage`: `ready → init` (manifest, args, storage snapshot,
+    user, theme), `call → result` (one table of methods, each forwarding to the app's own `ctx`, so
+    permission checks, prompts, master switches and airplane mode behave exactly as for built-in
+    apps), and `event` (resize, focus, blur, activate, notification, theme).
+  - The host forwards `beforeClose`, system shortcuts and crash reports between the frame and DonutOS.
+  - The host only accepts messages whose `source` is its own frame.
+- **Packages** (`core/dapp.js`). A `.dapp` file is JSON
+  `{format:'donutos-app', formatVersion:1, manifest, icon, source}`.
+  - `parseDapp` checks size (6 MB), validates the manifest, clamps window sizes, keeps only https homepages, and turns SVG icons into data URLs after stripping scripts and handlers.
+  - Install = `registry.install(manifest)`, which persists in the key-value store, so installed apps survive restarts on both platforms.
+- **Catalogs.** A catalog is `index.json` with entries pointing at `.dapp` files.
+  - The DonutOS catalog ships in `src/store/catalog/` and is precached, so the Store works offline.
+  - Extra catalogs and direct links go through the Store's `ctx.net.fetch` (network permission).
+  - Updates are offered when a catalog version is higher (`compareVersions`).
+  - Uninstall (`shell/apps.js › uninstallApp`) ends the app, unregisters it, and clears its `app.<id>.*` settings, permission grants and pins.
+- **Developer tools.** Terminal `dapp new|pack|install|list|uninstall`, `scripts/pack-dapp.js`,
+  and `npm start -- --devtools`. The full guide is [SDK.md](SDK.md).
 
 ## Security notes (desktop)
 

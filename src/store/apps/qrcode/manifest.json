@@ -1,0 +1,8 @@
+{
+  "id": "donutos.qrcode", "name": "QR Code", "version": "1.0.0", "author": "DonutOS",
+  "category": "Utilities", "summary": "Make QR codes for links, Wi-Fi and contacts",
+  "description": "Turn a web address, text, Wi-Fi network or contact card into a QR code that phones can scan. Choose the colours and error correction, then save it as a PNG or SVG picture.",
+  "features": ["Links, text, Wi-Fi and contacts", "Custom colours", "Save PNG or SVG"],
+  "permissions": ["files.write", "clipboard"],
+  "window": { "width": 820, "height": 560, "minWidth": 420, "minHeight": 420 }
+}

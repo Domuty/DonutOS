@@ -10,7 +10,8 @@ const crypto = require('node:crypto');
 const SRC = path.join(__dirname, '..', 'src');
 const OUT = path.join(SRC, 'precache-manifest.js');
 const SKIP = new Set(['sw.js', 'precache-manifest.js']);
-const SKIP_DIRS = new Set(['tests']);
+// Store app sources aren't needed at runtime: the packaged .dapp files in store/catalog are.
+const SKIP_DIRS = new Set(['tests', 'store/apps']);
 
 function walk(dir, rel = '') {
   const out = [];

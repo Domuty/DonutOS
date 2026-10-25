@@ -1,0 +1,8 @@
+{
+  "id": "donutos.2048", "name": "2048", "version": "1.0.0", "author": "DonutOS",
+  "category": "Games", "summary": "Slide tiles to reach 2048",
+  "description": "Slide the tiles and join matching numbers to reach 2048 — then keep going. Undo your last move, and your best score and game in progress are saved.",
+  "features": ["Undo", "Saves your game", "Keyboard and swipe"],
+  "permissions": [],
+  "window": { "width": 500, "height": 640, "minWidth": 320, "minHeight": 460 }
+}

@@ -1,0 +1,8 @@
+{
+  "id": "donutos.snake", "name": "Snake", "version": "1.0.0", "author": "DonutOS",
+  "category": "Games", "summary": "The classic arcade game",
+  "description": "Eat, grow, and don't bite your tail. Three speeds, walls or wrap-around, and your best scores are kept. Play with the arrow keys, WASD, or by swiping.",
+  "features": ["Three speeds", "Wrap-around mode", "High scores", "Touch controls"],
+  "permissions": [],
+  "window": { "width": 560, "height": 640, "minWidth": 320, "minHeight": 400 }
+}

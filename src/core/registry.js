@@ -12,10 +12,10 @@
 //   hidden: false                             // hide from Start / search (system services)
 // }
 // Instead of `entry`, an in-memory `module` ({ default(ctx) }) may be passed (tests, SDK),
-// and Store apps persist their code as `source` which is loaded from a Blob URL.
+// and Store apps persist their code as `source`, which runs sandboxed (src/sandbox/host.js).
 
 import { DonutError } from './errors.js';
-import { PERMISSIONS } from './permissions.js';
+import { PERMISSIONS, SANDBOX_PERMISSIONS } from './permissions.js';
 import { deepClone } from './util.js';
 
 const INSTALLED_KEY = 'apps:installed';
@@ -40,13 +40,19 @@ export function validateManifest(m) {
     else for (const t of m.fileTypes) if (typeof t !== 'string' || !/^\.[a-z0-9]+$/.test(t)) errors.push(`fileTypes entry "${t}" must look like ".txt"`);
   }
   if (m.window !== undefined && (typeof m.window !== 'object' || m.window === null)) errors.push('window must be an object');
+  if (m.source !== undefined) {
+    // Store apps run sandboxed; these powers aren't available to them.
+    for (const p of m.permissions || []) if (PERMISSIONS[p] && !SANDBOX_PERMISSIONS.includes(p)) errors.push(`Store apps can't use the "${p}" permission`);
+    if (m.privileged) errors.push('Store apps can’t be privileged');
+    if (m.source.length > 4 * 1024 * 1024) errors.push('source is larger than 4 MB');
+  }
+  if (m.preferredTypes !== undefined && !Array.isArray(m.preferredTypes)) errors.push('preferredTypes must be an array');
   return errors;
 }
 
 export class AppRegistry {
   #apps = new Map();
   #kv; #bus;
-  #blobUrls = new Map();
 
   constructor({ kv, bus }) {
     this.#kv = kv;
@@ -63,8 +69,10 @@ export class AppRegistry {
       ...manifest,
       builtin, installed,
       system: builtin && manifest.system !== false,
+      // Code from the Store runs in a sandboxed frame (src/sandbox/host.js), never in DonutOS's page.
+      sandboxed: !!manifest.source,
     };
-    if (m.source) m.entry = this.#blobUrlFor(m.id, m.source);
+    if (m.sandboxed) { delete m.entry; m.privileged = false; }
     this.#apps.set(m.id, m);
     this.#bus?.emit('apps:registered', { id: m.id });
     return m;
@@ -74,8 +82,6 @@ export class AppRegistry {
     const m = this.#apps.get(id);
     if (!m) return false;
     this.#apps.delete(id);
-    const url = this.#blobUrls.get(id);
-    if (url) { URL.revokeObjectURL(url); this.#blobUrls.delete(id); }
     this.#bus?.emit('apps:unregistered', { id });
     return true;
   }
@@ -126,11 +132,4 @@ export class AppRegistry {
     return { loaded: list.length - failed.length, failed };
   }
 
-  #blobUrlFor(id, source) {
-    const old = this.#blobUrls.get(id);
-    if (old) URL.revokeObjectURL(old);
-    const url = URL.createObjectURL(new Blob([source], { type: 'text/javascript' }));
-    this.#blobUrls.set(id, url);
-    return url;
-  }
 }

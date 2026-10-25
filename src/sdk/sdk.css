@@ -1,0 +1,55 @@
+/* DonutOS SDK styles: Store apps get the same look as built-in apps. Colours come from the
+   user's theme (the --tokens are set by DonutOS and update live). */
+
+*, *::before, *::after { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; }
+body { font: 14px/1.45 var(--font, system-ui, sans-serif); color: var(--text, #eee); background: var(--surface-solid, #1e1b22); -webkit-font-smoothing: antialiased; overflow: hidden; }
+#app { height: 100%; overflow: auto; }
+button, input, select, textarea { font: inherit; color: inherit; }
+h1, h2, h3 { font-family: var(--font-display, inherit); line-height: 1.25; margin: 0 0 .5em; }
+h1 { font-size: 24px; } h2 { font-size: 18px; } h3 { font-size: 15px; }
+p { margin: 0 0 .75em; }
+a { color: var(--accent-text); }
+small, .muted { color: var(--text-2); }
+.hint { font-size: 12px; color: var(--text-3); }
+hr { border: 0; border-top: 1px solid var(--border); margin: 12px 0; }
+::selection { background: color-mix(in srgb, var(--accent) 40%, transparent); }
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-thumb { background: color-mix(in srgb, var(--text) 25%, transparent); border-radius: 5px; border: 3px solid transparent; background-clip: padding-box; }
+
+.btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 32px; padding: 5px 14px; border-radius: var(--radius-s, 4px); border: 1px solid var(--border); border-bottom-color: var(--border-strong); background: var(--surface-2); color: var(--text); cursor: default; white-space: nowrap; transition: background .12s; }
+.btn:hover { background: var(--hover); }
+.btn:active { background: var(--press); }
+.btn:disabled { opacity: .45; pointer-events: none; }
+.btn.primary { background: var(--accent); color: var(--accent-contrast); border-color: transparent; }
+.btn.primary:hover { background: var(--accent-hover); }
+.btn.danger { background: var(--danger); color: #fff; border-color: transparent; }
+.btn.subtle { background: transparent; border-color: transparent; }
+.btn.subtle:hover { background: var(--hover); }
+.btn.icon { width: 32px; padding: 0; }
+
+.input { width: 100%; min-height: 32px; padding: 5px 11px; border-radius: var(--radius-s, 4px); border: 1px solid var(--input-border); border-bottom-color: var(--text-3); background: var(--input-bg); color: var(--text); outline: none; }
+.input:focus { border-bottom: 2px solid var(--accent); padding-bottom: 4px; background: var(--surface-raised); }
+.input::placeholder { color: var(--text-3); }
+select.input { appearance: none; padding-right: 30px; background-image: linear-gradient(45deg, transparent 50%, currentColor 50%), linear-gradient(135deg, currentColor 50%, transparent 50%); background-position: calc(100% - 15px) 50%, calc(100% - 10px) 50%; background-size: 5px 5px; background-repeat: no-repeat; }
+select.input option { background: var(--surface-solid); }
+textarea.input { resize: vertical; min-height: 80px; }
+.field { display: grid; gap: 6px; } .field > label { font-size: 13px; color: var(--text-2); }
+
+.toggle { position: relative; display: inline-flex; align-items: center; gap: 10px; }
+.toggle input { position: absolute; opacity: 0; width: 40px; height: 20px; margin: 0; }
+.toggle > span { width: 40px; height: 20px; border-radius: 10px; border: 1px solid var(--text-2); position: relative; transition: background .15s; }
+.toggle > span::after { content: ""; position: absolute; top: 3px; left: 3px; width: 12px; height: 12px; border-radius: 50%; background: var(--text-2); transition: transform .2s; }
+.toggle input:checked + span { background: var(--accent); border-color: var(--accent); }
+.toggle input:checked + span::after { transform: translateX(20px); background: var(--accent-contrast); }
+
+.card { background: var(--surface-2); border: 1px solid var(--border); border-radius: var(--radius, 8px); padding: 14px 16px; }
+.row { display: flex; align-items: center; gap: 10px; }
+.stack { display: grid; gap: 10px; }
+.grow { flex: 1; min-width: 0; }
+.page { padding: 16px 20px; }
+.list { display: grid; gap: 2px; }
+.list-item { display: flex; align-items: center; gap: 12px; padding: 8px 12px; border-radius: var(--radius-s, 4px); }
+.list-item:hover { background: var(--hover); }
+.toolbar { display: flex; align-items: center; gap: 6px; padding: 6px 10px; border-bottom: 1px solid var(--border); }
+.empty { display: grid; place-items: center; text-align: center; color: var(--text-2); padding: 40px 20px; }

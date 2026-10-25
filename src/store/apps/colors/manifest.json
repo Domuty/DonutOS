@@ -1,0 +1,8 @@
+{
+  "id": "donutos.colors", "name": "Colors", "version": "1.0.0", "author": "DonutOS",
+  "category": "Creativity", "summary": "Pick colours, build palettes, check contrast",
+  "description": "Pick any colour, see it as HEX, RGB and HSL, generate matching palettes (complementary, analogous, triadic, shades), check text contrast against WCAG, and keep your favourite colours. Click any value to copy it.",
+  "features": ["HEX, RGB and HSL", "Harmonies and shades", "WCAG contrast check", "Saved swatches"],
+  "permissions": ["clipboard"],
+  "window": { "width": 860, "height": 600, "minWidth": 420, "minHeight": 420 }
+}

@@ -2,7 +2,7 @@
   "name": "donutos",
   "productName": "DonutOS",
   "version": "0.1.0",
-  "description": "DonutOS — a desktop operating system environment for the web and the desktop.",
+  "description": "DonutOS \u2014 a desktop operating system environment for the web and the desktop.",
   "main": "electron/main.js",
   "author": "DonutOS contributors",
   "license": "MIT",
@@ -11,7 +11,8 @@
     "start": "electron .",
     "start:windowed": "electron . --windowed",
     "serve": "node scripts/serve.js",
-    "build:precache": "node scripts/build-precache.js",
+    "build:catalog": "node scripts/build-catalog.js",
+    "build:precache": "node scripts/build-catalog.js && node scripts/build-precache.js",
     "vendor": "node scripts/vendor.js",
     "test": "npm run test:node && npm run test:desktop",
     "test:node": "node --test tests/node/*.test.js",
@@ -19,7 +20,8 @@
     "dist": "npm run build:precache && electron-builder",
     "dist:win": "npm run build:precache && electron-builder --win",
     "dist:mac": "npm run build:precache && electron-builder --mac",
-    "dist:linux": "npm run build:precache && electron-builder --linux"
+    "dist:linux": "npm run build:precache && electron-builder --linux",
+    "pack-dapp": "node scripts/pack-dapp.js"
   },
   "devDependencies": {
     "electron": "45.0.0",
@@ -48,7 +50,9 @@
       }
     ],
     "win": {
-      "target": ["nsis"],
+      "target": [
+        "nsis"
+      ],
       "icon": "build/icon.png"
     },
     "nsis": {
@@ -59,12 +63,18 @@
       "shortcutName": "DonutOS"
     },
     "mac": {
-      "target": ["dmg", "zip"],
+      "target": [
+        "dmg",
+        "zip"
+      ],
       "icon": "build/icon.png",
       "category": "public.app-category.productivity"
     },
     "linux": {
-      "target": ["AppImage", "deb"],
+      "target": [
+        "AppImage",
+        "deb"
+      ],
       "icon": "build/icon.png",
       "category": "Utility"
     }

@@ -1,0 +1,8 @@
+{
+  "id": "donutos.typing", "name": "Typing Test", "version": "1.0.0", "author": "DonutOS",
+  "category": "Education", "summary": "Measure and improve your typing speed",
+  "description": "Type short passages against the clock to measure your words per minute and accuracy. See your mistakes as you go, pick a length, and track your progress over time.",
+  "features": ["Words per minute and accuracy", "15, 30 or 60 second tests", "Progress history"],
+  "permissions": [],
+  "window": { "width": 860, "height": 560, "minWidth": 420, "minHeight": 400 }
+}

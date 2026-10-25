@@ -4,6 +4,13 @@ const icon = (id) => `assets/icons/apps/${id}.svg`;
 
 export const BUILTIN_APPS = [
   {
+    id: 'store', name: 'Store', version: '1.0.0', icon: icon('store'), entry: 'apps/store/main.js',
+    description: 'Find and install apps and games', category: 'System', singleInstance: true, privileged: true,
+    permissions: ['network', 'files.read', 'system.apps', 'notifications'],
+    fileTypes: ['.dapp'], preferredTypes: ['.dapp'],
+    window: { width: 1120, height: 740, minWidth: 520, minHeight: 420 },
+  },
+  {
     id: 'browser', name: 'Browser', version: '1.0.0', icon: icon('browser'), entry: 'apps/browser/main.js',
     description: 'Browse the web with tabs, bookmarks and history', category: 'Internet',
     permissions: ['network', 'files.read', 'files.write', 'clipboard', 'notifications'],

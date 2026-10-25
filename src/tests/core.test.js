@@ -519,20 +519,33 @@ test('notifications: posting, Do Not Disturb and per-app mute', async () => {
   await kernel.processes.kill(p.pid);
 });
 
-test('installed apps persist and run from stored source', async () => {
-  const manifest = app('installed', {
-    source: 'export default function main(ctx) { ctx.storage.set("ran", true); }',
-    permissions: [],
-  });
-  await kernel.registry.install(manifest);
-  const p = await kernel.launch(manifest.id);
-  assert.equal(kernel.settings.get(`app.${manifest.id}.ran`), true);
-  await kernel.processes.kill(p.pid);
+test('installed apps persist, run sandboxed and can’t claim device permissions', async () => {
+  const manifest = app('installed', { source: 'export default function main(app) { app.storage.set("ran", true); }', permissions: ['network'] });
+  const m = await kernel.registry.install(manifest);
+  assert.ok(m.sandboxed, 'Store code is marked sandboxed');
+  assert.equal(m.entry, undefined);
+  assert.equal(m.privileged, false);
   const stored = await platform.kv.get('apps:installed');
   assert.ok(stored.some((r) => r.id === manifest.id));
   await kernel.registry.uninstall(manifest.id);
   assert.ok(!kernel.registry.has(manifest.id));
   assert.ok(!(await platform.kv.get('apps:installed')).some((r) => r.id === manifest.id));
+  let threw = false;
+  try { await kernel.registry.install(app('greedy', { source: 'export default () => {}', permissions: ['camera'] })); } catch (e) { threw = /camera/.test(e.message); }
+  assert.ok(threw, 'camera is refused for Store apps');
+});
+
+test('.dapp packages parse, sanitise icons and compare versions', async () => {
+  const { parseDapp, buildDapp, compareVersions } = await import('../core/dapp.js');
+  const text = buildDapp({ manifest: { id: 'com.test.pkg', name: 'Pkg', version: '1.2.0', permissions: ['notifications'] }, icon: '<svg xmlns="http://www.w3.org/2000/svg" onload="x()"><script>bad()</script><rect/></svg>', source: 'export default function main(app) {}' });
+  const m = parseDapp(text);
+  assert.equal(m.id, 'com.test.pkg');
+  assert.ok(m.icon.startsWith('data:image/svg+xml;base64,'));
+  assert.ok(!atob(m.icon.split(',')[1]).includes('script') && !atob(m.icon.split(',')[1]).includes('onload'));
+  let err = null;
+  try { parseDapp('{"format":"zip"}'); } catch (e) { err = e.code; }
+  assert.equal(err, 'EFORMAT');
+  assert.ok(compareVersions('1.2.10', '1.2.9') > 0 && compareVersions('2.0.0', '2.0.0') === 0 && compareVersions('1.0.0', '1.1') < 0);
 });
 
 test('kernel.open uses file associations', async () => {

@@ -18,6 +18,7 @@ const ORIGIN = 'donut://app';
 const args = process.argv.slice(1);
 const TESTS = args.includes('--tests');
 const WINDOWED = args.includes('--windowed') || TESTS;
+const DEVTOOLS = args.includes('--devtools'); // for app developers: opens Chromium DevTools in their own window
 
 protocol.registerSchemesAsPrivileged([{
   scheme: 'donut',
@@ -257,7 +258,7 @@ function createWindow() {
     },
   });
   win.removeMenu();
-  win.once('ready-to-show', () => win.show());
+  win.once('ready-to-show', () => { win.show(); if (DEVTOOLS) win.webContents.openDevTools({ mode: 'detach' }); });
   win.webContents.on('did-finish-load', () => { if (wantFullscreen) lockSystemKeys(); });
   // Leaving HTML full screen (holding Esc) must not leave a frameless, un-movable window.
   win.on('leave-html-full-screen', () => { if (wantFullscreen) setTimeout(() => { if (win && !win.isDestroyed()) win.setFullScreen(true); }, 50); });

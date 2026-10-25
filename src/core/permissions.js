@@ -26,6 +26,9 @@ export const PERMISSIONS = Object.freeze({
   'screen':           { label: 'Screen capture', description: 'Capture what is on your screen.', sensitive: true },
 });
 
+/** Permissions a Store (sandboxed) app may declare. Devices and system powers stay with built-in apps. */
+export const SANDBOX_PERMISSIONS = Object.freeze(['files.read', 'files.write', 'system.fs', 'network', 'notifications', 'clipboard', 'location']);
+
 export class PermissionManager {
   #settings; #registry; #bus;
   #prompter = null;

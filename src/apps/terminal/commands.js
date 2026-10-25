@@ -5,6 +5,8 @@ import { getopts } from './shell.js';
 import { formatBytes } from '../../core/util.js';
 import { zipPaths, unzipTo, listZip } from '../../lib/zip.js';
 import * as P from '../../core/path.js';
+import { parseDapp, buildDapp } from '../../core/dapp.js';
+import { uninstallApp } from '../../shell/apps.js';
 
 const pad = (s, n) => String(s).padStart(n);
 const dateStr = (t) => new Date(t).toLocaleString(undefined, { month: 'short', day: '2-digit', hour: '2-digit', minute: '2-digit' });
@@ -45,6 +47,7 @@ export function createCommands({ ctx, term }) {
     sleep: 'sleep seconds', seq: 'seq [first] last', true: 'true', false: 'false', exit: 'exit — close this tab',
     sh: 'sh script.dsh [args] — run a DonutOS script', source: 'source script — run a script in this shell',
     js: 'js [-e code] [file.js] — JavaScript (in an isolated worker); just “js” starts a JS prompt',
+    dapp: 'dapp new|pack|install|list|uninstall — make and install Store apps (see “dapp help”)',
     calc: 'calc expression — quick arithmetic', base64: 'base64 [-d] [files…]', edit: 'edit file — open a file in its app',
   };
 
@@ -565,6 +568,76 @@ export function createCommands({ ctx, term }) {
         else io.out(`${btoa(String.fromCharCode(...new TextEncoder().encode(text)))}\n`);
       }
       return 0;
+    },
+
+    async dapp(args, io, sh) {
+      const [sub, ...rest] = args;
+      const usage = () => {
+        io.out([
+          'dapp new Name           create an app folder in ~/Documents/Apps/Name (manifest.json, main.js, icon.svg)',
+          'dapp pack [folder]      build folder/../<id>.dapp from a folder (default: current folder)',
+          'dapp install [folder|file.dapp]   pack if needed, then open it in the Store to install',
+          'dapp list               apps installed from the Store or packages',
+          'dapp uninstall id       remove an installed app',
+          'The SDK reference is in docs/SDK.md of the DonutOS source.',
+        ].join('\n') + '\n');
+        return sub ? 0 : 2;
+      };
+      if (!sub || sub === 'help' || sub === '--help') return usage();
+      if (sub === 'new') {
+        const name = rest.join(' ').trim();
+        if (!name) { io.err('usage: dapp new Name\n'); return 2; }
+        const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'app';
+        const dir = P.join(sh.home, 'Documents', 'Apps', name.replace(/[\\/:*?"<>|]/g, '_'));
+        if (await sh.fs.exists(dir)) { io.err(`dapp: ${sh.display(dir)} already exists\n`); return 1; }
+        await sh.fs.mkdir(dir, { recursive: true });
+        const id = `${user().name.toLowerCase().replace(/[^a-z0-9]+/g, '') || 'me'}.${slug}`;
+        await sh.fs.writeText(P.join(dir, 'manifest.json'), `${JSON.stringify({ id, name, version: '1.0.0', author: user().name, category: 'Utilities',
+          description: `${name} — my DonutOS app.`, permissions: [], window: { width: 640, height: 460, minWidth: 320, minHeight: 240 } }, null, 2)}\n`);
+        await sh.fs.writeText(P.join(dir, 'main.js'), `// ${name} — a DonutOS Store app. Reference: docs/SDK.md\nimport { h, mount, css, ui } from '@donut/sdk';\n\ncss(\`\n.hello { padding: 24px; display: grid; gap: 12px; justify-items: start; }\n\`);\n\nexport default function main(app) {\n  let clicks = app.storage.get('clicks', 0);\n  const label = h('p', '');\n  const paint = () => { label.textContent = \`You clicked \${clicks} time\${clicks === 1 ? '' : 's'}.\`; };\n  mount(app.root, h('div.hello',\n    h('h1', 'Hello, ', app.user.name, '!'),\n    label,\n    h('button.btn.primary', { onclick: () => { clicks++; app.storage.set('clicks', clicks); paint(); } }, 'Click me'),\n    h('button.btn', { onclick: () => ui.alert('${name.replace(/'/g, "\\'")}', 'Edit main.js, then run “dapp install” again.') }, 'About')));\n  paint();\n}\n`);
+        await sh.fs.writeText(P.join(dir, 'icon.svg'), '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><rect width="64" height="64" rx="14" fill="#9466e8"/><text x="32" y="42" font-family="Arial" font-size="28" font-weight="700" text-anchor="middle" fill="#fff">' + (name[0] || 'A').toUpperCase().replace(/[<&>]/g, '') + '</text></svg>\n');
+        io.out(`Created ${sh.display(dir)}\n  manifest.json  main.js  icon.svg\nNext: cd ${sh.display(dir).replace(/([ '"\\])/g, '\\$1')}  then: edit main.js  then: dapp install\n`);
+        return 0;
+      }
+      const pack = async (dirArg) => {
+        const dir = sh.resolve(dirArg || '.');
+        const manifest = JSON.parse(await sh.fs.readText(P.join(dir, 'manifest.json')));
+        const source = await sh.fs.readText(P.join(dir, manifest.main || 'main.js'));
+        const icon = (await sh.fs.exists(P.join(dir, 'icon.svg'))) ? await sh.fs.readText(P.join(dir, 'icon.svg')) : undefined;
+        const text = buildDapp({ manifest, source, icon });
+        parseDapp(text); // fail now, with a clear message, rather than in the Store
+        const out = P.join(P.dirname(dir), `${manifest.id}.dapp`);
+        await sh.fs.writeText(out, text);
+        return out;
+      };
+      if (sub === 'pack') {
+        try { const out = await pack(rest[0]); io.out(`Packed ${sh.display(out)}\n`); return 0; } catch (err) { io.err(`dapp pack: ${err.message}\n`); return 1; }
+      }
+      if (sub === 'install') {
+        try {
+          let file = rest[0] ? sh.resolve(rest[0]) : sh.cwd;
+          if (await sh.fs.isDir(file)) file = await pack(file);
+          parseDapp(await sh.fs.readText(file));
+          await ctx.launch('store', { path: file });
+          io.out(`Opened ${sh.display(file)} in the Store. Select Install there.\n`);
+          return 0;
+        } catch (err) { io.err(`dapp install: ${err.message}\n`); return 1; }
+      }
+      if (sub === 'list') {
+        const apps = k.registry.list({ includeHidden: true }).filter((a) => a.installed);
+        if (!apps.length) io.out('No apps installed from the Store.\n');
+        for (const a of apps) io.out(`${a.id.padEnd(28)} ${a.version.padEnd(9)} ${a.name}\n`);
+        return 0;
+      }
+      if (sub === 'uninstall') {
+        const a = k.registry.get(rest[0]);
+        if (!a?.installed) { io.err(`dapp: no installed app “${rest[0] || ''}”\n`); return 1; }
+        await uninstallApp(k, a.id, user().id);
+        io.out(`Uninstalled ${a.name}\n`);
+        return 0;
+      }
+      io.err(`dapp: unknown command “${sub}”\n`);
+      return usage();
     },
 
     async sh(args, io, shell) { return term.runScript(args[0], args.slice(1), io, { subshell: true, shell }); },

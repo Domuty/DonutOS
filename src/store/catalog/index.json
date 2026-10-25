@@ -1,0 +1,175 @@
+{
+ "name": "DonutOS Store",
+ "apps": [
+  {
+   "id": "donutos.colors",
+   "name": "Colors",
+   "version": "1.0.0",
+   "author": "DonutOS",
+   "description": "Pick any colour, see it as HEX, RGB and HSL, generate matching palettes (complementary, analogous, triadic, shades), check text contrast against WCAG, and keep your favourite colours. Click any value to copy it.",
+   "summary": "Pick colours, build palettes, check contrast",
+   "category": "Creativity",
+   "permissions": [
+    "clipboard"
+   ],
+   "features": [
+    "HEX, RGB and HSL",
+    "Harmonies and shades",
+    "WCAG contrast check",
+    "Saved swatches"
+   ],
+   "size": 8537,
+   "package": "donutos.colors.dapp",
+   "icon": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2NCA2NCI+PHJlY3Qgd2lkdGg9IjY0IiBoZWlnaHQ9IjY0IiByeD0iMTQiIGZpbGw9IiNmZmYiLz48Y2lyY2xlIGN4PSIyNCIgY3k9IjI2IiByPSIxMyIgZmlsbD0iI2U4NjE4YyIgb3BhY2l0eT0iLjkiLz48Y2lyY2xlIGN4PSI0MCIgY3k9IjI2IiByPSIxMyIgZmlsbD0iIzRjYjc4MiIgb3BhY2l0eT0iLjkiLz48Y2lyY2xlIGN4PSIzMiIgY3k9IjQwIiByPSIxMyIgZmlsbD0iIzViN2NmMCIgb3BhY2l0eT0iLjkiLz48L3N2Zz4=",
+   "updated": null
+  },
+  {
+   "id": "donutos.2048",
+   "name": "2048",
+   "version": "1.0.0",
+   "author": "DonutOS",
+   "description": "Slide the tiles and join matching numbers to reach 2048 — then keep going. Undo your last move, and your best score and game in progress are saved.",
+   "summary": "Slide tiles to reach 2048",
+   "category": "Games",
+   "permissions": [],
+   "features": [
+    "Undo",
+    "Saves your game",
+    "Keyboard and swipe"
+   ],
+   "size": 7586,
+   "package": "donutos.2048.dapp",
+   "icon": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2NCA2NCI+PHJlY3Qgd2lkdGg9IjY0IiBoZWlnaHQ9IjY0IiByeD0iMTQiIGZpbGw9IiNlZGMyMmUiLz48dGV4dCB4PSIzMiIgeT0iNDAiIGZvbnQtZmFtaWx5PSJBcmlhbCwgc2Fucy1zZXJpZiIgZm9udC13ZWlnaHQ9IjcwMCIgZm9udC1zaXplPSIyMCIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZmlsbD0iI2ZmZiI+MjA0ODwvdGV4dD48L3N2Zz4=",
+   "updated": null
+  },
+  {
+   "id": "donutos.markdown",
+   "name": "Markdown Studio",
+   "version": "1.0.0",
+   "author": "DonutOS",
+   "description": "A two-pane Markdown editor: write on the left, see the formatted result on the right as you type. Headings, lists, task lists, tables, code blocks, quotes, links and images. Opens and saves .md files, and exports HTML.",
+   "summary": "Write Markdown with a live preview",
+   "category": "Productivity",
+   "permissions": [
+    "files.read",
+    "files.write"
+   ],
+   "features": [
+    "Live preview",
+    "Task lists and tables",
+    "Export to HTML",
+    "Word count"
+   ],
+   "size": 11043,
+   "package": "donutos.markdown.dapp",
+   "icon": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2NCA2NCI+PHJlY3Qgd2lkdGg9IjY0IiBoZWlnaHQ9IjY0IiByeD0iMTQiIGZpbGw9IiMyYjJmM2EiLz48cGF0aCBkPSJNMTIgNDRWMjBoNmw3IDkgNy05aDZ2MjRoLTZWMzBsLTcgOS03LTl2MTR6IiBmaWxsPSIjZmZmIi8+PHBhdGggZD0iTTQ2IDIwaDZ2MTRoNWwtOCAxMC04LTEwaDV6IiBmaWxsPSIjNmFhOGZmIi8+PC9zdmc+",
+   "updated": null
+  },
+  {
+   "id": "donutos.qrcode",
+   "name": "QR Code",
+   "version": "1.0.0",
+   "author": "DonutOS",
+   "description": "Turn a web address, text, Wi-Fi network or contact card into a QR code that phones can scan. Choose the colours and error correction, then save it as a PNG or SVG picture.",
+   "summary": "Make QR codes for links, Wi-Fi and contacts",
+   "category": "Utilities",
+   "permissions": [
+    "files.write",
+    "clipboard"
+   ],
+   "features": [
+    "Links, text, Wi-Fi and contacts",
+    "Custom colours",
+    "Save PNG or SVG"
+   ],
+   "size": 17330,
+   "package": "donutos.qrcode.dapp",
+   "icon": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2NCA2NCI+PHJlY3Qgd2lkdGg9IjY0IiBoZWlnaHQ9IjY0IiByeD0iMTQiIGZpbGw9IiNmZmYiLz48ZyBmaWxsPSIjMWIxYjJmIj48cGF0aCBkPSJNMTAgMTBoMTh2MThIMTB6TTM2IDEwaDE4djE4SDM2ek0xMCAzNmgxOHYxOEgxMHoiLz48L2c+PGcgZmlsbD0iI2ZmZiI+PHBhdGggZD0iTTE0IDE0aDEwdjEwSDE0ek00MCAxNGgxMHYxMEg0MHpNMTQgNDBoMTB2MTBIMTR6Ii8+PC9nPjxnIGZpbGw9IiMxYjFiMmYiPjxwYXRoIGQ9Ik0xNyAxN2g0djRoLTR6TTQzIDE3aDR2NGgtNHpNMTcgNDNoNHY0aC00ek0zNiAzNmg2djZoLTZ6TTQ2IDM2aDh2NGgtOHpNMzYgNDZoNHY4aC00ek00NCA0NGgxMHYxMEg0NHoiLz48L2c+PHJlY3QgeD0iMSIgeT0iMSIgd2lkdGg9IjYyIiBoZWlnaHQ9IjYyIiByeD0iMTMiIGZpbGw9Im5vbmUiIHN0cm9rZT0iI2U4NjE4YyIgc3Ryb2tlLXdpZHRoPSIyIi8+PC9zdmc+",
+   "updated": null
+  },
+  {
+   "id": "donutos.snake",
+   "name": "Snake",
+   "version": "1.0.0",
+   "author": "DonutOS",
+   "description": "Eat, grow, and don't bite your tail. Three speeds, walls or wrap-around, and your best scores are kept. Play with the arrow keys, WASD, or by swiping.",
+   "summary": "The classic arcade game",
+   "category": "Games",
+   "permissions": [],
+   "features": [
+    "Three speeds",
+    "Wrap-around mode",
+    "High scores",
+    "Touch controls"
+   ],
+   "size": 6677,
+   "package": "donutos.snake.dapp",
+   "icon": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2NCA2NCI+PHJlY3Qgd2lkdGg9IjY0IiBoZWlnaHQ9IjY0IiByeD0iMTQiIGZpbGw9IiMxZjJiMjAiLz48cGF0aCBkPSJNMTQgNDZoMTRWMzBoMjIiIGZpbGw9Im5vbmUiIHN0cm9rZT0iIzZhZDM4ZiIgc3Ryb2tlLXdpZHRoPSI5IiBzdHJva2UtbGluZWNhcD0icm91bmQiIHN0cm9rZS1saW5lam9pbj0icm91bmQiLz48Y2lyY2xlIGN4PSI1MCIgY3k9IjMwIiByPSIyIiBmaWxsPSIjMWYyYjIwIi8+PGNpcmNsZSBjeD0iMjAiIGN5PSIxOCIgcj0iNSIgZmlsbD0iI2ZmNWQ1ZCIvPjwvc3ZnPg==",
+   "updated": null
+  },
+  {
+   "id": "donutos.todo",
+   "name": "To Do",
+   "version": "1.0.0",
+   "author": "DonutOS",
+   "description": "Keep track of what you need to do. Make lists, plan My Day, star important tasks, add due dates, steps and notes, and get a notification when a reminder is due while To Do is open.",
+   "summary": "Lists, due dates and reminders",
+   "category": "Productivity",
+   "permissions": [
+    "notifications"
+   ],
+   "features": [
+    "Multiple lists",
+    "My Day and Important",
+    "Due dates and reminders",
+    "Steps and notes"
+   ],
+   "size": 13346,
+   "package": "donutos.todo.dapp",
+   "icon": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2NCA2NCI+PGRlZnM+PGxpbmVhckdyYWRpZW50IGlkPSJhIiB4MT0iMCIgeTE9IjAiIHgyPSIxIiB5Mj0iMSI+PHN0b3Agb2Zmc2V0PSIwIiBzdG9wLWNvbG9yPSIjNWI3Y2YwIi8+PHN0b3Agb2Zmc2V0PSIxIiBzdG9wLWNvbG9yPSIjM2I0ZmM0Ii8+PC9saW5lYXJHcmFkaWVudD48L2RlZnM+PHJlY3Qgd2lkdGg9IjY0IiBoZWlnaHQ9IjY0IiByeD0iMTQiIGZpbGw9InVybCgjYSkiLz48cGF0aCBkPSJNMTggMzNsOSA5IDE5LTIwIiBmaWxsPSJub25lIiBzdHJva2U9IiNmZmYiIHN0cm9rZS13aWR0aD0iNyIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBzdHJva2UtbGluZWpvaW49InJvdW5kIi8+PC9zdmc+",
+   "updated": null
+  },
+  {
+   "id": "donutos.typing",
+   "name": "Typing Test",
+   "version": "1.0.0",
+   "author": "DonutOS",
+   "description": "Type short passages against the clock to measure your words per minute and accuracy. See your mistakes as you go, pick a length, and track your progress over time.",
+   "summary": "Measure and improve your typing speed",
+   "category": "Education",
+   "permissions": [],
+   "features": [
+    "Words per minute and accuracy",
+    "15, 30 or 60 second tests",
+    "Progress history"
+   ],
+   "size": 7555,
+   "package": "donutos.typing.dapp",
+   "icon": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2NCA2NCI+PHJlY3Qgd2lkdGg9IjY0IiBoZWlnaHQ9IjY0IiByeD0iMTQiIGZpbGw9IiNmMDhhNGIiLz48cmVjdCB4PSIxMCIgeT0iMjIiIHdpZHRoPSI0NCIgaGVpZ2h0PSIyNCIgcng9IjQiIGZpbGw9IiNmZmYiLz48ZyBmaWxsPSIjZjA4YTRiIj48cmVjdCB4PSIxNCIgeT0iMjYiIHdpZHRoPSI1IiBoZWlnaHQ9IjUiIHJ4PSIxIi8+PHJlY3QgeD0iMjIiIHk9IjI2IiB3aWR0aD0iNSIgaGVpZ2h0PSI1IiByeD0iMSIvPjxyZWN0IHg9IjMwIiB5PSIyNiIgd2lkdGg9IjUiIGhlaWdodD0iNSIgcng9IjEiLz48cmVjdCB4PSIzOCIgeT0iMjYiIHdpZHRoPSI1IiBoZWlnaHQ9IjUiIHJ4PSIxIi8+PHJlY3QgeD0iNDYiIHk9IjI2IiB3aWR0aD0iNSIgaGVpZ2h0PSI1IiByeD0iMSIvPjxyZWN0IHg9IjE4IiB5PSIzNiIgd2lkdGg9IjI4IiBoZWlnaHQ9IjUiIHJ4PSIxIi8+PC9nPjwvc3ZnPg==",
+   "updated": null
+  },
+  {
+   "id": "donutos.weather",
+   "name": "Weather",
+   "version": "1.0.0",
+   "author": "DonutOS",
+   "description": "Current conditions, a 24-hour forecast and the week ahead for any city in the world, from the free Open-Meteo service. Save your favourite places and switch between °C and °F.",
+   "summary": "Forecasts for any city",
+   "category": "Utilities",
+   "permissions": [
+    "network",
+    "location"
+   ],
+   "features": [
+    "Search any city",
+    "Hourly and 7-day forecasts",
+    "Saved places",
+    "Use your location"
+   ],
+   "size": 13101,
+   "package": "donutos.weather.dapp",
+   "icon": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2NCA2NCI+PGRlZnM+PGxpbmVhckdyYWRpZW50IGlkPSJhIiB4MT0iMCIgeTE9IjAiIHgyPSIwIiB5Mj0iMSI+PHN0b3Agb2Zmc2V0PSIwIiBzdG9wLWNvbG9yPSIjNGZhOGY3Ii8+PHN0b3Agb2Zmc2V0PSIxIiBzdG9wLWNvbG9yPSIjMjQ2M2M5Ii8+PC9saW5lYXJHcmFkaWVudD48L2RlZnM+PHJlY3Qgd2lkdGg9IjY0IiBoZWlnaHQ9IjY0IiByeD0iMTQiIGZpbGw9InVybCgjYSkiLz48Y2lyY2xlIGN4PSIyNSIgY3k9IjI1IiByPSIxMCIgZmlsbD0iI2ZmZDM0ZCIvPjxwYXRoIGQ9Ik0yMiA0NmgyNGE4IDggMCAwIDAgMC0xNiAxMSAxMSAwIDAgMC0yMS0yIDggOCAwIDAgMC0zIDE4eiIgZmlsbD0iI2ZmZiIvPjwvc3ZnPg==",
+   "updated": null
+  }
+ ]
+}

@@ -1,0 +1,8 @@
+{
+  "id": "donutos.weather", "name": "Weather", "version": "1.0.0", "author": "DonutOS",
+  "category": "Utilities", "summary": "Forecasts for any city",
+  "description": "Current conditions, a 24-hour forecast and the week ahead for any city in the world, from the free Open-Meteo service. Save your favourite places and switch between °C and °F.",
+  "features": ["Search any city", "Hourly and 7-day forecasts", "Saved places", "Use your location"],
+  "permissions": ["network", "location"],
+  "window": { "width": 820, "height": 600, "minWidth": 380, "minHeight": 420 }
+}

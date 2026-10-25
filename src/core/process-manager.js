@@ -150,7 +150,8 @@ export class ProcessManager {
     const t0 = performance.now();
     this.#bus.emit('process:start', proc.info());
     try {
-      const mod = app.module || (await import(new URL(app.entry, document.baseURI).href));
+      const mod = app.module
+        || (app.sandboxed ? (await import('../sandbox/host.js')).sandboxModule(app) : await import(new URL(app.entry, document.baseURI).href));
       const main = mod.default || mod.main;
       if (typeof main !== 'function') throw new ProcessError('ENOMAIN', `${app.id} does not export a main(ctx) function`);
       const ctx = this.#createContext(proc);

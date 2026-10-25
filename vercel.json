@@ -2,7 +2,7 @@
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "framework": null,
   "installCommand": "echo 'DonutOS web needs no install step'",
-  "buildCommand": "node scripts/build-precache.js",
+  "buildCommand": "node scripts/build-catalog.js && node scripts/build-precache.js",
   "outputDirectory": "src",
   "headers": [
     {
