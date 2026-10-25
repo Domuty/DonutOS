@@ -58,7 +58,7 @@ export class AppRegistry {
     if (errors.length) throw new DonutError('EMANIFEST', `Invalid manifest for "${manifest?.id}": ${errors.join('; ')}`, { errors });
     const m = {
       permissions: [], fileTypes: [], singleInstance: false, hidden: false,
-      category: 'Other', description: '', icon: 'assets/brand/logo.svg',
+      category: 'Other', description: '', icon: new URL('../assets/brand/logo.svg', import.meta.url).href,
       ...manifest,
       builtin, installed,
       system: builtin && manifest.system !== false,

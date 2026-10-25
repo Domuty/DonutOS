@@ -31,6 +31,10 @@ export class AppWindow {
     this.state = 'normal';
     this.bounds = { x: 0, y: 0, w: this.opts.width, h: this.opts.height };
     this.prevBounds = null;
+    this.snap = null;          // { frac: [x, y, w, h] of the work area, group } when snapped
+    this.preSnap = null;       // bounds to return to when un-snapping
+    this.desktop = null;       // virtual desktop id (set by the window manager)
+    this.allDesktops = false;
     this.listeners = new Map();
     this.beforeClose = [];
     this.closing = false;
@@ -45,7 +49,10 @@ export class AppWindow {
     this.titlebarSlot = h('div.win-tb-slot');
     const btn = (name, label, fn, hidden) => h(`button.win-btn.win-${name}`, { type: 'button', title: label, 'aria-label': label, hidden, tabindex: '-1', onclick: (e) => { e.stopPropagation(); fn(); } });
     this.minBtn = btn('min', 'Minimize', () => this.minimize(), !o.minimizable);
-    this.maxBtn = btn('max', 'Maximize', () => this.toggleMaximize(), !o.maximizable || !o.resizable);
+    this.maxBtn = btn('max', 'Maximize', () => { this.wm.snapper.hideLayouts(); this.toggleMaximize(); }, !o.maximizable || !o.resizable);
+    // Hovering the maximize button offers snap layouts.
+    this.maxBtn.addEventListener('pointerenter', () => { clearTimeout(this.layoutHover); this.layoutHover = setTimeout(() => this.wm.snapper.showLayouts(this, this.maxBtn), 450); });
+    this.maxBtn.addEventListener('pointerleave', () => { clearTimeout(this.layoutHover); this.wm.snapper.hideLayoutsSoon(); });
     this.closeBtn = btn('close', 'Close', () => this.close());
     this.minBtn.innerHTML = CONTROL_ICONS.min; this.maxBtn.innerHTML = CONTROL_ICONS.max; this.closeBtn.innerHTML = CONTROL_ICONS.close;
     this.titlebar = h('div.win-titlebar', this.iconEl, this.titleEl, this.titlebarSlot, h('div.win-controls', this.minBtn, this.maxBtn, this.closeBtn));
@@ -134,9 +141,14 @@ export class AppWindow {
           base = { x: startX - pb.w * ratio, y: 0, w: pb.w, h: pb.h };
           this.bounds = { ...base };
           this.emit('state', this.state);
+        } else if (this.snap) {
+          base = this.wm.snapper.release(this, startX);
+          this.bounds = { ...base };
+          this.emit('state', this.state);
         }
         this.wm.dragStart?.(this, ev);
       }
+      this.wm.snapper.detectShake(this, ev); // every move, so fast shakes are seen
       if (frame) return;
       frame = requestAnimationFrame(() => {
         frame = 0;
@@ -184,7 +196,12 @@ export class AppWindow {
     const move = (ev) => {
       last = ev;
       if (frame) return;
-      frame = requestAnimationFrame(() => { frame = 0; this.setBounds(compute(last), { save: false }); });
+      frame = requestAnimationFrame(() => {
+        frame = 0;
+        const before = { ...this.bounds };
+        this.setBounds(compute(last), { save: false });
+        this.wm.snapper.resizing(this, before, this.bounds);
+      });
     };
     const up = (ev) => {
       handle.removeEventListener('pointermove', move);
@@ -192,7 +209,10 @@ export class AppWindow {
       handle.removeEventListener('pointercancel', up);
       cancelAnimationFrame(frame);
       this.el.classList.remove('resizing');
+      const before = { ...this.bounds };
       this.setBounds(compute(ev));
+      this.wm.snapper.resizing(this, before, this.bounds);
+      this.wm.snapper.resized(this);
     };
     handle.addEventListener('pointermove', move);
     handle.addEventListener('pointerup', up);
@@ -215,7 +235,12 @@ export class AppWindow {
     if (this.state === 'maximized' || !this.opts.resizable) return;
     if (this.state === 'minimized') this.restore();
     const from = { ...this.bounds };
-    this.prevBounds = { ...this.bounds };
+    if (this.snap) {
+      this.prevBounds = this.preSnap ? { ...this.preSnap } : { ...this.bounds };
+      this.wm.snapper.leave(this);
+    } else {
+      this.prevBounds = { ...this.bounds };
+    }
     const a = this.wm.workArea();
     this.state = 'maximized';
     this.el.classList.add('maximized');
@@ -328,7 +353,7 @@ export class AppWindow {
       id: w.id,
       body: w.body,
       titlebar: w.titlebarSlot,
-      get state() { return w.state; },
+      get state() { return w.snap ? 'snapped' : w.state; },
       get active() { return w.wm.active === w; },
       setTitle: (t) => w.setTitle(t),
       setIcon: (u) => w.setIcon(u),

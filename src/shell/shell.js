@@ -181,8 +181,21 @@ export class Shell {
     add('wm.desktop', ['Meta+D', 'Ctrl+Alt+D'], 'Show the desktop', () => wm().toggleDesktop(), 'Windows');
     add('wm.minimizeAll', ['Meta+M', 'Ctrl+Alt+M'], 'Minimize all windows', () => wm().minimizeAll(), 'Windows');
     add('wm.close', ['Alt+F4', 'Ctrl+Alt+Q'], 'Close the active window', () => this.#closeRequest(), 'Windows', { inInputs: true });
-    add('wm.maximize', ['Meta+ArrowUp', 'Ctrl+Alt+ArrowUp'], 'Maximize the active window', () => wm().active?.maximize(), 'Windows');
-    add('wm.restore', ['Meta+ArrowDown', 'Ctrl+Alt+ArrowDown'], 'Restore / minimize the active window', () => { const a = wm().active; if (!a) return; if (a.state === 'maximized') a.unmaximize(); else a.minimize(); }, 'Windows');
+    const arrow = (dir) => () => wm().snapper.keyboard(wm().active, dir);
+    add('wm.snapUp', ['Meta+ArrowUp', 'Ctrl+Alt+ArrowUp'], 'Maximize, or snap to the top', arrow('up'), 'Windows');
+    add('wm.snapDown', ['Meta+ArrowDown', 'Ctrl+Alt+ArrowDown'], 'Restore, minimize, or snap to the bottom', arrow('down'), 'Windows');
+    add('wm.snapLeft', ['Meta+ArrowLeft', 'Ctrl+Alt+ArrowLeft'], 'Snap the active window left', arrow('left'), 'Windows');
+    add('wm.snapRight', ['Meta+ArrowRight', 'Ctrl+Alt+ArrowRight'], 'Snap the active window right', arrow('right'), 'Windows');
+    add('wm.snapLayouts', ['Meta+Z', 'Ctrl+Alt+Z'], 'Snap layouts for the active window', () => { const a = wm().active; if (a) wm().snapper.showLayouts(a, a.maxBtn); }, 'Windows');
+    add('wm.minimizeOthers', ['Meta+Home', 'Ctrl+Alt+Home'], 'Minimize all but the active window', () => { const a = wm().active; if (a) wm().snapper.toggleOthers(a); }, 'Windows');
+    add('wm.altTab', ['Alt+Tab', 'Alt+Backquote'], 'Switch windows (hold Alt)', () => this.view.altTab.start(), 'Windows', { inInputs: true });
+    add('wm.altTabBack', ['Alt+Shift+Tab', 'Alt+Shift+Backquote'], 'Switch windows backwards', () => this.view.altTab.start({ reverse: true }), 'Windows', { inInputs: true });
+    add('wm.switcher', ['Ctrl+Alt+Tab'], 'Window switcher that stays open', () => this.view.altTab.start({ sticky: true }), 'Windows');
+    add('wm.taskView', ['Meta+Tab', 'Ctrl+Alt+Space'], 'Task view', () => this.view.taskView.toggle(), 'Desktops');
+    add('desk.new', ['Ctrl+Meta+D', 'Ctrl+Alt+Shift+D'], 'New virtual desktop', () => this.view.desktops.create({ switchTo: true }), 'Desktops');
+    add('desk.close', ['Ctrl+Meta+F4', 'Ctrl+Alt+Shift+F4'], 'Close the current desktop', () => this.view.desktops.remove(this.view.desktops.current), 'Desktops');
+    add('desk.next', ['Ctrl+Meta+ArrowRight', 'Ctrl+Alt+Shift+ArrowRight'], 'Next desktop', () => this.view.desktops.next(), 'Desktops');
+    add('desk.prev', ['Ctrl+Meta+ArrowLeft', 'Ctrl+Alt+Shift+ArrowLeft'], 'Previous desktop', () => this.view.desktops.prev(), 'Desktops');
     for (let i = 1; i <= 9; i++) {
       add(`taskbar.app${i}`, [`Meta+${i}`, `Ctrl+Alt+${i}`], `Open taskbar app ${i}`, () => {
         const item = this.view.taskbar.items()[i - 1];

@@ -8,6 +8,9 @@
 // PrintScreen...). "Meta" alone means "press and release the Windows/Command key".
 
 const MODS = ['Ctrl', 'Alt', 'Shift', 'Meta'];
+// Punctuation keys are named by their physical key so shortcuts work on every layout.
+const PUNCT = { '.': 'Period', ',': 'Comma', '/': 'Slash', '\\': 'Backslash', ';': 'Semicolon', "'": 'Quote', '`': 'Backquote', '-': 'Minus', '=': 'Equal', '[': 'BracketLeft', ']': 'BracketRight' };
+const PUNCT_CODES = new Set(Object.values(PUNCT));
 
 /** Normalises a written combination ("alt+ctrl+e") to canonical form ("Ctrl+Alt+E"). */
 export function normalizeCombo(combo) {
@@ -18,7 +21,7 @@ export function normalizeCombo(combo) {
     const m = MODS.find((x) => x.toLowerCase() === p.toLowerCase() || (x === 'Meta' && /^(win|cmd|super)$/i.test(p)) || (x === 'Ctrl' && /^control$/i.test(p)));
     if (m) mods.add(m); else key = p.length === 1 ? p.toUpperCase() : p;
   }
-  if (key === '.') key = 'Period';
+  if (PUNCT[key]) key = PUNCT[key];
   return [...MODS.filter((m) => mods.has(m)), key].filter(Boolean).join('+');
 }
 
@@ -27,7 +30,8 @@ export function comboFromEvent(e) {
   let key;
   if (/^Key[A-Z]$/.test(e.code)) key = e.code.slice(3);
   else if (/^Digit\d$/.test(e.code)) key = e.code.slice(5);
-  else if (e.code === 'Period' || e.code === 'NumpadDecimal') key = 'Period';
+  else if (PUNCT_CODES.has(e.code)) key = e.code;
+  else if (e.code === 'NumpadDecimal') key = 'Period';
   else if (e.code === 'Space') key = 'Space';
   else key = e.key.length === 1 ? e.key.toUpperCase() : e.key;
   if (MODS.includes(key) || ['Control', 'Shift', 'Alt', 'Meta', 'OS'].includes(e.key)) key = '';
@@ -38,7 +42,8 @@ export function comboFromEvent(e) {
 /** Human-readable label: "Ctrl+Alt+E", "Win+E" (uses ⌘ on macOS). */
 export function labelFor(combo) {
   const mac = /Mac/.test(navigator.platform);
-  return combo.split('+').map((p) => (p === 'Meta' ? (mac ? '⌘' : 'Win') : p === 'Period' ? '.' : p)).join('+');
+  const symbol = Object.fromEntries(Object.entries(PUNCT).map(([k, v]) => [v, k]));
+  return combo.split('+').map((p) => (p === 'Meta' ? (mac ? '⌘' : 'Win') : symbol[p] || p.replace(/^Arrow/, ''))).join('+');
 }
 
 export class ShortcutRegistry {

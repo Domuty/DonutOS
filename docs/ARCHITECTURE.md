@@ -142,8 +142,8 @@ donutos/
     │   └── display-filters.js   ✅ brightness, night light (high contrast & magnifier: 8)
     ├── wm/
     │   ├── window-manager.js, window.js  ✅ windows, focus, z-order, previews, remembered bounds
-    │   ├── snap.js, snap-layouts.js      4
-    │   ├── virtual-desktops.js, task-view.js, alt-tab.js  4
+    │   ├── snap.js                       ✅ edge/corner snapping, layouts, Snap Assist, groups, shake, Win+Arrow
+    │   ├── virtual-desktops.js, task-view.js, alt-tab.js  ✅
     ├── ui/                      ✅ h.js (DOM helper), icons.js, avatar.js, dialog.js, menu.js
     ├── apps/
     │   ├── index.js             ✅ built-in manifest list (filled as apps arrive)
@@ -292,6 +292,26 @@ Quick Settings maps to real behaviour: Wi-Fi off / airplane mode take DonutOS of
 `network` permission becomes *blocked*, the weather stops refreshing); Bluetooth gates Bluetooth
 for apps; brightness and night light are screen-wide filters; volume drives every DonutOS sound;
 focus is a timed do-not-disturb.
+
+## Window management (phase 4)
+
+- **Snapping** (`wm/snap.js`): positions are stored as fractions of the work area
+  (`win.snap.frac`), so snapped windows follow screen and taskbar changes. Dragging a window to an
+  edge, corner or the top shows a preview; dropping snaps it and offers **Snap Assist** for the
+  remaining area. Hovering the maximize button (or Win+Z) shows six **snap layouts**.
+- **Snap groups**: windows snapped together share a group; dragging the shared edge resizes the
+  neighbours too (never below their minimum size); the taskbar preview offers the whole group.
+  Moving, maximizing or closing a member takes it out of the group.
+- **Shake** a title bar to minimize the other windows on this desktop; shake again to bring them back.
+- **Win+Arrow** moves between halves, quarters, maximized, restored and minimized.
+- **Virtual desktops** (`wm/virtual-desktops.js`): per-user list (names, optional per-desktop
+  background) and current desktop are saved; each window has `desktop` or `allDesktops`.
+  Focusing a window on another desktop switches there.
+- **Task View** (`wm/task-view.js`) and **Alt+Tab** (`wm/alt-tab.js`) list windows in
+  most-recently-used order; both can include all desktops (Settings › System › Multitasking).
+- **Full-screen keys**: in full screen, Chromium's Keyboard Lock gives DonutOS the Win key,
+  Alt+Tab and similar system shortcuts (desktop build: always when launched full screen; web: after
+  turning on Full screen in Settings › Display). Holding Esc for two seconds hands them back.
 
 ## Security notes (desktop)
 

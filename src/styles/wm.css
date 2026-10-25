@@ -1,0 +1,67 @@
+/* Snapping, snap layouts, Snap Assist, Task View, Alt+Tab, desktop switching. */
+
+.snap-preview {
+  position: absolute; border-radius: var(--radius); pointer-events: none;
+  background: var(--accent-soft); border: 2px solid var(--accent);
+  backdrop-filter: blur(6px); box-shadow: 0 8px 32px rgba(0,0,0,.25);
+  transition: left .18s var(--ease-out), top .18s var(--ease-out), width .18s var(--ease-out), height .18s var(--ease-out);
+}
+
+.snap-layouts { position: absolute; display: grid; grid-template-columns: repeat(3, 84px); gap: 10px; padding: 12px; border-radius: var(--radius); animation: menu-in .15s var(--ease-out); }
+.sl-layout { position: relative; height: 52px; }
+.sl-cell { position: absolute; padding: 0; border: 0; cursor: default; background: transparent; }
+.sl-cell::after { content: ""; position: absolute; inset: 2px; border-radius: 4px; background: var(--surface-3); border: 1px solid var(--border-strong); transition: background .1s; }
+.sl-cell:hover::after, .sl-cell:focus-visible::after { background: var(--accent); border-color: var(--accent); }
+
+.snap-assist { position: absolute; padding: 12px; overflow: auto; background: rgba(0,0,0,.28); backdrop-filter: blur(24px) saturate(1.2); border: 1px solid var(--border-strong); animation: fade-in .2s ease; }
+.sa-grid { display: flex; flex-wrap: wrap; gap: 12px; justify-content: center; align-content: center; min-height: 100%; }
+.sa-card { display: grid; gap: 6px; padding: 8px; border: 2px solid transparent; border-radius: var(--radius); background: var(--surface); color: var(--text); cursor: default; }
+.sa-card:hover, .sa-card:focus-visible { border-color: var(--accent); outline: none; }
+.sa-head, .tv-head, .at-head { display: flex; align-items: center; gap: 8px; font-size: 12px; min-width: 0; }
+.sa-head img, .tv-head img, .at-head img { width: 16px; height: 16px; flex: none; }
+.sa-head span, .tv-head span, .at-head span { flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 200px; text-align: left; }
+
+/* Task View */
+.task-view { position: absolute; left: 0; right: 0; top: 0; bottom: 48px; z-index: 25; display: flex; flex-direction: column; background: rgba(0,0,0,.35); backdrop-filter: blur(40px) saturate(1.3); -webkit-backdrop-filter: blur(40px) saturate(1.3); animation: tv-in .25s var(--ease-out); outline: none; color: #fff; }
+.task-view.out { animation: tv-out .2s var(--ease-in) forwards; }
+@keyframes tv-in { from { opacity: 0; transform: scale(1.03); } }
+@keyframes tv-out { to { opacity: 0; transform: scale(1.03); } }
+.tv-grid { flex: 1; min-height: 0; overflow: auto; display: flex; flex-wrap: wrap; align-content: center; justify-content: center; gap: 20px; padding: 40px 32px 20px; }
+.tv-card { display: grid; gap: 8px; padding: 8px; border-radius: var(--radius); border: 2px solid transparent; cursor: default; outline: none; transition: background .12s; animation: rise .3s var(--ease-out) both; }
+.tv-card:hover, .tv-card:focus-visible { background: rgba(255,255,255,.12); }
+.tv-card:focus-visible { border-color: #fff; }
+.tv-head { color: #fff; }
+.tv-shot { display: grid; place-items: center; }
+.tv-close { width: 22px; height: 22px; border: 0; border-radius: 4px; background: none; color: inherit; display: grid; place-items: center; opacity: 0; cursor: default; }
+.tv-card:hover .tv-close, .tv-desk:hover .tv-close, .tv-card:focus-within .tv-close { opacity: 1; }
+.tv-close:hover { background: #c42b1c; color: #fff; }
+.tv-empty { color: rgba(255,255,255,.75); font-size: 15px; }
+.tv-desks { flex: none; display: flex; gap: 16px; justify-content: center; align-items: flex-end; padding: 16px 24px 20px; overflow-x: auto; background: rgba(0,0,0,.18); border-top: 1px solid rgba(255,255,255,.1); }
+.tv-desk { width: 176px; flex: none; display: grid; gap: 6px; padding: 6px; border-radius: var(--radius); border: 2px solid transparent; cursor: default; outline: none; }
+.tv-desk:hover, .tv-desk:focus-visible { background: rgba(255,255,255,.12); }
+.tv-desk.current .tv-desk-thumb { box-shadow: 0 0 0 2px var(--accent); }
+.tv-desk.drop { border-color: var(--accent); background: rgba(255,255,255,.18); }
+.tv-desk-thumb { position: relative; height: 99px; border-radius: 6px; background: #222; overflow: hidden; }
+.tv-desk-thumb i { position: absolute; border-radius: 2px; background: rgba(255,255,255,.55); box-shadow: 0 0 0 1px rgba(0,0,0,.25); }
+.tv-desk-foot { display: flex; align-items: center; gap: 6px; font-size: 12.5px; }
+.tv-desk-name { flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tv-rename { flex: 1; min-width: 0; font: inherit; padding: 2px 6px; border: 1px solid var(--accent); border-radius: 4px; background: var(--surface-raised); color: var(--text); }
+.tv-new { width: 120px; height: 99px; margin-bottom: 26px; flex: none; display: grid; place-items: center; align-content: center; gap: 6px; border: 1px dashed rgba(255,255,255,.4); border-radius: 6px; background: rgba(255,255,255,.06); color: #fff; font-size: 12.5px; cursor: default; }
+.tv-new:hover { background: rgba(255,255,255,.14); }
+.tb-btn.pressed { background: var(--surface-3); }
+
+/* Alt+Tab */
+.alt-tab { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -55%); z-index: 60; display: flex; gap: 10px; padding: 14px; border-radius: var(--radius-l); max-width: calc(100vw - 48px); overflow-x: auto; animation: fade-in .1s; }
+.at-item { display: grid; gap: 6px; padding: 8px; border-radius: var(--radius); border: 2px solid transparent; cursor: default; flex: none; position: relative; }
+.at-item:hover { background: var(--hover); }
+.at-item.sel { border-color: var(--accent); background: var(--accent-soft); }
+.at-shot { display: grid; place-items: center; min-height: 80px; }
+.at-desk { position: absolute; right: 12px; bottom: 12px; font-size: 11px; padding: 2px 6px; border-radius: 4px; background: rgba(0,0,0,.55); color: #fff; }
+
+/* "Desktop 2" indicator */
+.desk-pill { position: absolute; left: 50%; top: 40%; transform: translateX(-50%); z-index: 40; padding: 14px 28px; border-radius: 28px; font: 600 18px/1.2 var(--font-display); color: var(--text); animation: rise .25s var(--ease-out); pointer-events: none; }
+.desk-pill.out { animation: fade-out .25s forwards; }
+
+/* Snap-group preview on the taskbar */
+.tbp-groupthumb { position: relative; border-radius: 4px; overflow: hidden; background: var(--surface-2); }
+.tbp-group .tbp-head { color: var(--accent-text); }

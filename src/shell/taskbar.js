@@ -28,9 +28,10 @@ export class Taskbar {
       h('img', { src: 'assets/brand/logo.svg', alt: '', draggable: 'false' }));
     this.searchBox = h('button.tb-search', { type: 'button', 'aria-label': 'Search', 'aria-expanded': 'false', onclick: () => session.flyouts.toggle('search') }, svgSearch(), h('span', 'Search'));
     this.searchIcon = h('button.tb-btn', { type: 'button', title: 'Search', 'aria-label': 'Search', onclick: () => session.flyouts.toggle('search') }, svgSearch());
+    this.taskViewBtn = h('button.tb-btn', { type: 'button', title: 'Task view', 'aria-label': 'Task view', 'aria-pressed': 'false', onclick: () => session.taskView.toggle() }, taskViewIcon());
     this.weatherBtn = h('button.tb-weather', { type: 'button', title: 'Widgets', 'aria-label': 'Widgets', 'aria-expanded': 'false', onclick: () => session.flyouts.toggle('widgets') });
     this.appsEl = h('div.tb-apps', { role: 'list' });
-    this.center = h('div.tb-center', this.startBtn, this.searchBox, this.searchIcon, this.appsEl);
+    this.center = h('div.tb-center', this.startBtn, this.searchBox, this.searchIcon, this.taskViewBtn, this.appsEl);
     this.left = h('div.tb-left');
     this.trayBtn = h('button.tb-tray', { type: 'button', 'aria-label': 'Quick settings', 'aria-expanded': 'false', onclick: () => session.flyouts.toggle('qs') });
     this.trayBtn.addEventListener('wheel', (e) => {
@@ -68,6 +69,7 @@ export class Taskbar {
     this.disposers.push(
       this.wm.subscribe(() => this.renderApps()),
       s.watch('taskbar.*', () => { this.applyLayout(); this.renderApps(); this.tickClock(); }),
+      s.watch('wm.taskbarScope', () => this.renderApps()),
       s.watch('qs.*', () => this.renderTray()),
       s.watch('notifications.*', () => this.renderClockExtras()),
       s.watch('time.*', () => this.tickClock()),
@@ -96,10 +98,12 @@ export class Taskbar {
     this.searchBox.hidden = search !== 'box';
     this.searchIcon.hidden = search !== 'icon';
     this.weatherBtn.hidden = !s.get('taskbar.showWidgets');
+    this.taskViewBtn.hidden = !s.get('taskbar.showTaskView');
     // Centered: weather sits at the far left. Left-aligned: after the app buttons' start.
     if (s.get('taskbar.alignment') === 'left') this.right.prepend(this.weatherBtn);
     else this.left.append(this.weatherBtn);
     this.applyAutoHide();
+    this.wm.fitToScreen();
     this.stopClock?.();
     this.stopClock = everyTick(() => this.tickClock(), { seconds: s.get('taskbar.showSeconds') });
   }
@@ -117,9 +121,12 @@ export class Taskbar {
   hidden() { return this.settings.get('taskbar.autoHide'); }
 
   // ── App buttons ──────────────────────────────────────────────────────
+  setTaskView(on) { this.taskViewBtn.setAttribute('aria-pressed', String(on)); this.taskViewBtn.classList.toggle('pressed', on); }
+
   items() {
     const pins = pinned(this.kernel, 'taskbar');
-    const wins = this.wm.list();
+    const all = this.settings.get('wm.taskbarScope') === 'all';
+    const wins = this.wm.list().filter((w) => all || this.wm.isVisible(w));
     const order = [...pins];
     for (const w of wins) if (!order.includes(w.appId)) order.push(w.appId);
     return order.map((appId) => ({ appId, app: this.kernel.registry.get(appId) || { id: appId, name: appId, icon: wins.find((w) => w.appId === appId)?.icon }, windows: wins.filter((w) => w.appId === appId), pinned: pins.includes(appId) }));
@@ -232,7 +239,17 @@ export class Taskbar {
   showPreview(item, windows, anchor, sticky = false) {
     if (document.querySelector('.menu') || !anchor.isConnected) return;
     this.previewSticky = sticky;
-    mount(this.preview, windows.map((w) => h('div.tbp-item', {
+    // Snap groups get their own preview, which brings the whole group back together.
+    const groups = [];
+    for (const w of windows) {
+      const members = this.wm.snapper.groupOf(w);
+      if (members && !groups.some((g) => g.includes(w))) groups.push(members);
+    }
+    const groupCards = groups.map((members) => h('div.tbp-item.tbp-group', {
+      role: 'button', tabindex: '0', 'aria-label': `Snap group: ${members.map((m) => m.title).join(', ')}`,
+      onclick: () => { this.closePreview(); this.wm.snapper.focusGroup(members[0]); },
+    }, h('div.tbp-head', icon('view', { size: 14 }), h('span', 'Group')), this.groupThumb(members)));
+    mount(this.preview, ...groupCards, windows.map((w) => h('div.tbp-item', {
       role: 'button', tabindex: '0', 'aria-label': w.title,
       onclick: () => { this.closePreview(); this.wm.focus(w); },
       onkeydown: (e) => { if (e.key === 'Enter') { this.closePreview(); this.wm.focus(w); } },
@@ -246,6 +263,17 @@ export class Taskbar {
     this.preview.style.left = `${Math.max(8, Math.min(innerWidth - r.width - 8, a.left + a.width / 2 - r.width / 2))}px`;
     this.preview.style.bottom = `${innerHeight - a.top + 8}px`;
     if (sticky) setTimeout(() => document.addEventListener('pointerdown', this.outside = (e) => { if (!this.preview.contains(e.target)) this.closePreview(); }, { capture: true, once: true }));
+  }
+
+  /** A miniature of a snap group: each member's snapshot in its place on the screen. */
+  groupThumb(members) {
+    const a = this.wm.workArea();
+    const W = 220, H = Math.round(W * (a.h / a.w));
+    return h('div.tbp-groupthumb', { style: { width: `${W}px`, height: `${H}px` } }, members.map((m) => {
+      const r = m.bounds;
+      const shot = this.wm.snapshot(m, (r.w / a.w) * W, (r.h / a.h) * H);
+      return h('div', { style: { position: 'absolute', left: `${((r.x - a.x) / a.w) * W}px`, top: `${((r.y - a.y) / a.h) * H}px` } }, shot);
+    }));
   }
 
   closePreview() {
@@ -303,6 +331,12 @@ export class Taskbar {
 function svgSearch() {
   const t = document.createElement('template');
   t.innerHTML = '<svg class="ic" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="10.5" cy="10.5" r="6.5"/><path d="M15.5 15.5L20 20"/></svg>';
+  return t.content.firstElementChild;
+}
+
+function taskViewIcon() {
+  const t = document.createElement('template');
+  t.innerHTML = '<svg class="ic" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><rect x="3" y="6" width="12" height="12" rx="2"/><path d="M18 7.5h2a1 1 0 0 1 1 1v7a1 1 0 0 1-1 1h-2"/><path d="M15 3.5h-9"/></svg>';
   return t.content.firstElementChild;
 }
 

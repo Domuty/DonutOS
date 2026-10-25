@@ -37,6 +37,7 @@ let sandbox = null;
 let kv = null;
 let updater = null;
 let allowClose = false; // set when DonutOS itself (or the OS) really wants to quit
+let wantFullscreen = !WINDOWED;
 const send = (channel, payload) => { if (win && !win.isDestroyed()) win.webContents.send(channel, payload); };
 
 /** Registers an IPC handler that only answers DonutOS itself and wraps results/errors. */
@@ -74,7 +75,12 @@ function registerIpc() {
     return { data: new Uint8Array(img.toPNG()), width: size.width, height: size.height };
   });
 
-  handle('display:setFullscreen', (on) => { win.setFullScreen(!!on); return !!on; });
+  handle('display:setFullscreen', (on) => {
+    wantFullscreen = !!on;
+    win.setFullScreen(!!on);
+    if (on) lockSystemKeys(); else win.webContents.executeJavaScript('document.fullscreenElement && document.exitFullscreen()', true).catch(() => {});
+    return !!on;
+  });
 
   handle('host:importFiles', async ({ multiple = true, accept = '', directory = false } = {}) => {
     const exts = String(accept).split(',').map((s) => s.trim()).filter((s) => s.startsWith('.')).map((s) => s.slice(1));
@@ -152,6 +158,19 @@ function lockDownSession() {
   session.defaultSession.setPermissionCheckHandler((wc, permission, origin) => allowed.has(permission) && String(origin).startsWith(ORIGIN));
 }
 
+/**
+ * Full-screen DonutOS behaves like an OS shell: Chromium's Keyboard Lock lets the page
+ * receive the Windows/Command key, Alt+Tab and friends (only Ctrl+Alt+Del and Win+L stay
+ * with the host). Holding Esc for two seconds releases the keys again.
+ */
+function lockSystemKeys() {
+  if (!win || win.isDestroyed()) return;
+  win.webContents.executeJavaScript(
+    "document.documentElement.requestFullscreen({ navigationUI: 'hide' }).then(() => navigator.keyboard && navigator.keyboard.lock()).catch(() => {})",
+    true,
+  ).catch(() => {});
+}
+
 function createWindow() {
   win = new BrowserWindow({
     width: 1440,
@@ -176,6 +195,9 @@ function createWindow() {
   });
   win.removeMenu();
   win.once('ready-to-show', () => win.show());
+  win.webContents.on('did-finish-load', () => { if (wantFullscreen) lockSystemKeys(); });
+  // Leaving HTML full screen (holding Esc) must not leave a frameless, un-movable window.
+  win.on('leave-html-full-screen', () => { if (wantFullscreen) setTimeout(() => { if (win && !win.isDestroyed()) win.setFullScreen(true); }, 50); });
   win.on('enter-full-screen', () => send('display:fullscreen', true));
   win.on('leave-full-screen', () => send('display:fullscreen', false));
 

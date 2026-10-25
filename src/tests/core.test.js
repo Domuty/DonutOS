@@ -683,6 +683,8 @@ import { normalizeCombo, comboFromEvent, ShortcutRegistry } from '../core/shortc
 test('shortcuts: combos are normalised and dispatched', () => {
   assert.equal(normalizeCombo('alt+ctrl+e'), 'Ctrl+Alt+E');
   assert.equal(normalizeCombo('Win+.'), 'Meta+Period');
+  assert.equal(normalizeCombo('alt+`'), 'Alt+Backquote');
+  assert.equal(comboFromEvent(new KeyboardEvent('keydown', { code: 'Backquote', key: '`', altKey: true })), 'Alt+Backquote');
   assert.equal(comboFromEvent(new KeyboardEvent('keydown', { code: 'KeyE', key: 'e', ctrlKey: true, altKey: true })), 'Ctrl+Alt+E');
   const reg = new ShortcutRegistry();
   const target = new EventTarget();
@@ -742,6 +744,142 @@ test('apps get windows from the window host; closing the last window ends the ap
   assert.equal(created[0].opts.title, 'Hello');
   await kernel.processes.kill(p.pid);
   kernel.setWindowHost(null);
+});
+
+// ── Window manager (phase 4) ─────────────────────────────────────────
+
+import { WindowManager } from '../wm/window-manager.js';
+import { VirtualDesktops } from '../wm/virtual-desktops.js';
+import { ZONES, LAYOUTS, fracToRect, zoneAt } from '../wm/snap.js';
+
+async function wmFixture() {
+  await kernel.signIn(USER);
+  const layer = document.createElement('div');
+  layer.style.cssText = 'position:fixed;inset:0;pointer-events:none;visibility:hidden';
+  document.body.append(layer);
+  const wm = new WindowManager({ kernel, uid: USER.id, layer });
+  const desktops = new VirtualDesktops({ wm, settings: kernel.settings.forUser(USER.id), layer });
+  kernel.setWindowHost(() => wm);
+  const handles = [];
+  const m = kernel.registry.register(app(`wmapp${Math.random().toString(36).slice(2, 6)}`, { module: { default(ctx) { handles.push(ctx.windows.create({ title: ctx.args.title || 'W', width: 500, height: 400 })); } } }));
+  const open = async (title) => { const p = await kernel.launch(m.id, { title }); return { p, win: wm.list().find((w) => w.pid === p.pid) }; };
+  const cleanup = async () => {
+    for (const p of kernel.processes.byApp(m.id)) await kernel.processes.kill(p.pid, { force: true });
+    wm.destroy(); layer.remove(); kernel.setWindowHost(null);
+    kernel.settings.reset('wm.desktops'); kernel.settings.reset('wm.currentDesktop');
+  };
+  return { wm, desktops, open, cleanup, handles };
+}
+
+test('snap zones: edges, corners and the top edge', () => {
+  const a = { x: 0, y: 0, w: 1000, h: 800 };
+  assert.equal(zoneAt(2, 400, a), 'left');
+  assert.equal(zoneAt(998, 400, a), 'right');
+  assert.equal(zoneAt(500, 2, a), 'max');
+  assert.equal(zoneAt(2, 20, a), 'tl');
+  assert.equal(zoneAt(995, 790, a), 'br');
+  assert.equal(zoneAt(500, 400, a), null);
+  assert.deepEqual(fracToRect(ZONES.right, a), { x: 500, y: 0, w: 500, h: 800 });
+  assert.deepEqual(fracToRect(LAYOUTS[1][0], a), { x: 0, y: 0, w: 667, h: 800 });
+});
+
+test('snapping a window and restoring its earlier size', async () => {
+  const f = await wmFixture();
+  try {
+    const { win } = await f.open('A');
+    const before = { ...win.bounds };
+    f.wm.snapper.snap(win, ZONES.left);
+    assert.deepEqual(win.bounds, fracToRect(ZONES.left, f.wm.workArea()));
+    assert.equal(f.handles[0].state, 'snapped');
+    f.wm.snapper.unsnap(win, { animate: false });
+    assert.deepEqual([win.bounds.w, win.bounds.h], [before.w, before.h]);
+    assert.equal(win.snap, null);
+  } finally { await f.cleanup(); }
+});
+
+test('Win+Arrow moves through halves, quarters, maximize and back', async () => {
+  const f = await wmFixture();
+  try {
+    const { win } = await f.open('K');
+    const kb = (d) => f.wm.snapper.keyboard(win, d);
+    const a = f.wm.workArea();
+    kb('left'); assert.deepEqual(win.bounds, fracToRect(ZONES.left, a), 'left half');
+    kb('up'); assert.deepEqual(win.bounds, fracToRect(ZONES.tl, a), 'top-left quarter');
+    kb('right'); assert.deepEqual(win.bounds, fracToRect(ZONES.tr, a), 'top-right quarter');
+    kb('up'); assert.equal(win.state, 'maximized');
+    kb('right'); assert.deepEqual(win.bounds, fracToRect(ZONES.right, a), 'maximized → right half');
+    kb('left'); assert.equal(win.snap, null, 'right half → restored');
+    kb('up'); assert.equal(win.state, 'maximized');
+    kb('down'); assert.equal(win.state, 'normal');
+  } finally { await f.cleanup(); }
+});
+
+test('snap groups: shared edges resize together, and leaving breaks the group', async () => {
+  const f = await wmFixture();
+  try {
+    const { win: a } = await f.open('A');
+    const { win: b } = await f.open('B');
+    const sn = f.wm.snapper;
+    sn.snap(a, LAYOUTS[0][0], { group: 'gtest' });
+    sn.snap(b, LAYOUTS[0][1], { group: 'gtest' });
+    assert.equal(sn.groupOf(a)?.length, 2);
+    const before = { ...a.bounds };
+    a.bounds = { ...a.bounds, w: a.bounds.w + 100 };
+    sn.resizing(a, before, a.bounds);
+    assert.equal(b.bounds.x, before.x + before.w + 100, 'neighbour moved its left edge');
+    assert.equal(b.bounds.x + b.bounds.w, fracToRect(LAYOUTS[0][1], f.wm.workArea()).x + fracToRect(LAYOUTS[0][1], f.wm.workArea()).w, 'neighbour kept its right edge');
+    a.maximize();
+    assert.equal(sn.groupOf(b), null, 'a group of one is dissolved');
+    assert.equal(a.snap, null);
+  } finally { await f.cleanup(); }
+});
+
+test('virtual desktops: create, move windows, switch, close', async () => {
+  const f = await wmFixture();
+  try {
+    const { win: a } = await f.open('A');
+    const d1 = f.desktops.current;
+    const d2 = f.desktops.create();
+    assert.equal(f.desktops.list().length, 2);
+    f.desktops.moveWindow(a, d2.id);
+    assert.ok(!f.wm.isVisible(a) && a.el.hidden, 'moved away: hidden');
+    f.desktops.switchTo(d2.id, { animate: false });
+    assert.ok(f.wm.isVisible(a) && !a.el.hidden, 'visible on its desktop');
+    const { win: b } = await f.open('B');
+    assert.equal(b.desktop, d2.id, 'new windows open on the current desktop');
+    f.desktops.setAllDesktops(b, true);
+    f.desktops.switchTo(d1, { animate: false });
+    assert.ok(f.wm.isVisible(b) && !f.wm.isVisible(a), 'pinned windows follow you');
+    assert.equal(kernel.settings.get('wm.currentDesktop'), d1, 'current desktop is saved');
+    f.desktops.rename(d2.id, 'Work');
+    assert.equal(f.desktops.get(d2.id).name, 'Work');
+    f.desktops.remove(d2.id);
+    assert.equal(f.desktops.list().length, 1);
+    assert.equal(a.desktop, d1, 'windows move to the remaining desktop');
+    assert.ok(f.wm.isVisible(a));
+  } finally { await f.cleanup(); }
+});
+
+test('focusing a window on another desktop switches to it', async () => {
+  const f = await wmFixture();
+  try {
+    const { win } = await f.open('Far');
+    const d2 = f.desktops.create();
+    f.desktops.moveWindow(win, d2.id);
+    f.wm.focus(win);
+    assert.equal(f.desktops.current, d2.id);
+    assert.equal(f.wm.active, win);
+  } finally { await f.cleanup(); }
+});
+
+test('closing an app\'s last window ends the app', async () => {
+  const f = await wmFixture();
+  try {
+    const { p } = await f.open('Last');
+    await f.handles.at(-1).close();
+    await sleep(20);
+    assert.equal(kernel.processes.get(p.pid), null);
+  } finally { await f.cleanup(); }
 });
 
 test('signing out ends the user\'s apps', async () => {

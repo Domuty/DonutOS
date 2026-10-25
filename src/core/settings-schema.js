@@ -60,7 +60,12 @@ export const SCHEMA = {
   'wm.snapEnabled':           { scope: 'user', type: 'boolean', default: true },
   'wm.snapLayouts':           { scope: 'user', type: 'boolean', default: true },
   'wm.shakeToMinimize':       { scope: 'user', type: 'boolean', default: true },
+  'wm.snapAssist':            { scope: 'user', type: 'boolean', default: true },
+  'wm.snapGroups':            { scope: 'user', type: 'boolean', default: true },
+  'wm.altTabScope':           { scope: 'user', type: 'string', default: 'desktop', enum: ['desktop', 'all'] },
+  'wm.taskbarScope':          { scope: 'user', type: 'string', default: 'desktop', enum: ['desktop', 'all'] },
   'wm.desktops':              { scope: 'user', type: 'array', default: [{ id: 'd1', name: 'Desktop 1' }] },
+  'wm.currentDesktop':        { scope: 'user', type: 'string', default: 'd1' },
   'wm.bounds.*':              { scope: 'user', type: 'object', default: null },
 
   // ── Quick settings / system state ────────────────────────────────────

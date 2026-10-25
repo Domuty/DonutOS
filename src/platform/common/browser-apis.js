@@ -83,8 +83,15 @@ export function fullscreenApi() {
   return {
     setFullscreen: async (on) => {
       try {
-        if (on && !document.fullscreenElement) await document.documentElement.requestFullscreen({ navigationUI: 'hide' });
-        else if (!on && document.fullscreenElement) await document.exitFullscreen();
+        if (on && !document.fullscreenElement) {
+          await document.documentElement.requestFullscreen({ navigationUI: 'hide' });
+          // In full screen, Chromium lets the page receive system keys (Win key, Alt+Tab…),
+          // so DonutOS's own shortcuts work. Holding Esc leaves full screen.
+          await navigator.keyboard?.lock?.().catch(() => {});
+        } else if (!on && document.fullscreenElement) {
+          navigator.keyboard?.unlock?.();
+          await document.exitFullscreen();
+        }
       } catch { /* the browser refused (no user gesture) */ }
       return !!document.fullscreenElement;
     },

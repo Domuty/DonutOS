@@ -14,6 +14,9 @@ import { Widgets } from './widgets.js';
 import { Weather } from './weather.js';
 import { Desktop } from './desktop.js';
 import { ClipboardPanel } from './clipboard-panel.js';
+import { VirtualDesktops } from '../wm/virtual-desktops.js';
+import { TaskView } from '../wm/task-view.js';
+import { AltTab } from '../wm/alt-tab.js';
 
 export class SessionView {
   constructor(shell, user) {
@@ -40,6 +43,9 @@ export class SessionView {
         flash: (win) => this.taskbar?.flash(win),
       },
     });
+    this.desktops = new VirtualDesktops({ wm: this.wm, settings: this.settings, layer: this.el, onWallpaper: () => this.paint() });
+    this.taskView = new TaskView(this);
+    this.altTab = new AltTab(this);
     // Flyouts must exist before the taskbar wires its buttons to them.
     this.start = new StartMenu(this);
     this.search = new Search(this);
@@ -51,6 +57,7 @@ export class SessionView {
     this.toasts = new Toasts(this);
     this.desktop = new Desktop(this);
 
+    this.flyoutLayer.addEventListener('flyout-opening', () => this.taskView.close());
     this.disposers.push(
       this.settings.watch('appearance.wallpaper', () => this.paint()),
       this.settings.watch('appearance.wallpaperFit', () => this.paint()),
@@ -64,7 +71,9 @@ export class SessionView {
   get user() { return this.kernel.sessions.get(this.uid)?.user; }
 
   async paint() {
-    const res = await paintWallpaper(this.wp, this.settings.get('appearance.wallpaper'), this.kernel.fs, this.settings.get('appearance.wallpaperFit'));
+    // A virtual desktop can have its own background.
+    const spec = this.desktops?.wallpaper() || this.settings.get('appearance.wallpaper');
+    const res = await paintWallpaper(this.wp, spec, this.kernel.fs, this.settings.get('appearance.wallpaperFit'));
     this.makeMica(res);
   }
 
@@ -92,9 +101,9 @@ export class SessionView {
     });
   }
 
-  hide() { this.flyouts.close(); this.el.hidden = true; this.el.inert = true; }
+  hide() { this.flyouts.close(); this.taskView.close(); this.altTab.cancel(); this.el.hidden = true; this.el.inert = true; }
   show() { this.el.hidden = false; this.el.inert = false; this.el.classList.remove('appear'); void this.el.offsetWidth; this.el.classList.add('appear'); }
-  setInert(on) { this.el.inert = on; if (on) this.flyouts.close(); }
+  setInert(on) { this.el.inert = on; if (on) { this.flyouts.close(); this.taskView.close(); this.altTab.cancel(); } }
 
   destroy() {
     for (const d of this.disposers) d();

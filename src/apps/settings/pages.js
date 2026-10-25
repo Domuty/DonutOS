@@ -25,7 +25,7 @@ export function renderPage(id, el, env) {
 
 const hub = (el, env, ids) => mount(el, ids.map((id) => link(ICONS[id] || 'chevronRight', PAGES[id].title, PAGES[id].description, () => env.go(id))));
 const ICONS = {
-  display: 'monitor', sound: 'volume', notifications: 'info', focus: 'sparkle', power: 'power', storage: 'folder', clipboard: 'clipboard', shortcuts: 'keypad', about: 'info',
+  multitasking: 'view', display: 'monitor', sound: 'volume', notifications: 'info', focus: 'sparkle', power: 'power', storage: 'folder', clipboard: 'clipboard', shortcuts: 'keypad', about: 'info',
   background: 'image', colors: 'palette', lockscreen: 'lock', taskbar: 'apps', start: 'view', fonts: 'edit', desktop: 'monitor',
 };
 
@@ -37,7 +37,7 @@ const RENDER = {
       h('div.set-hero', h('img', { src: 'assets/brand/logo.svg', alt: '' }), h('div', h('b', k.settings.get('system.deviceName')), h('small', `DonutOS ${k.version} · ${k.platform.name === 'desktop' ? 'Desktop app' : 'Web'}`),
         h('button.link', { type: 'button', onclick: () => env.go('about') }, 'Rename'))),
       h('div.panel'));
-    hub(el.lastChild, env, ['display', 'sound', 'notifications', 'focus', 'power', 'storage', 'clipboard', 'shortcuts', 'about']);
+    hub(el.lastChild, env, ['display', 'sound', 'notifications', 'focus', 'power', 'storage', 'multitasking', 'clipboard', 'shortcuts', 'about']);
   },
 
   display(el, { s, k }) {
@@ -128,6 +128,21 @@ const RENDER = {
     return () => { alive = false; };
   },
 
+  multitasking(el, { s }) {
+    mount(el, h('div.panel',
+      section('Snap windows'),
+      row('view', 'Snap windows', 'Drag a window to an edge or corner to arrange it', toggle(s, 'wm.snapEnabled')),
+      row(null, 'Show snap layouts when I hover over a window’s maximize button', 'Also with Win+Z or Ctrl+Alt+Z', toggle(s, 'wm.snapLayouts')),
+      row(null, 'When I snap a window, suggest what I can snap next to it', null, toggle(s, 'wm.snapAssist')),
+      row(null, 'Keep snapped windows together as groups', 'Shown when you hover taskbar apps', toggle(s, 'wm.snapGroups')),
+      section('Other'),
+      row('restart', 'Title bar window shake', 'Shake a window’s title bar to minimize all the others', toggle(s, 'wm.shakeToMinimize')),
+      section('Desktops'),
+      row('apps', 'On the taskbar, show windows that are open on', null, select(s, 'wm.taskbarScope', [['desktop', 'Only the desktop I’m using'], ['all', 'All desktops']], { width: 240 })),
+      row('arrowRight', 'Pressing Alt+Tab shows windows that are open on', null, select(s, 'wm.altTabScope', [['desktop', 'Only the desktop I’m using'], ['all', 'All desktops']], { width: 240 })),
+      row('view', 'Task view button on the taskbar', 'Win+Tab or Ctrl+Alt+Space opens Task view', toggle(s, 'taskbar.showTaskView'))));
+  },
+
   clipboard(el, { s, k }) {
     mount(el, h('div.panel',
       row('clipboard', 'Clipboard history', 'Keep a list of what you copy. Open it with Win+V or Ctrl+Alt+V', toggle(s, 'privacy.clipboardHistory')),
@@ -140,7 +155,7 @@ const RENDER = {
       if (!groups.has(sc.group)) groups.set(sc.group, []);
       groups.get(sc.group).push(sc);
     }
-    mount(el, h('p.hint', 'Your computer keeps some Win-key shortcuts for itself (for example Win+L on Windows). Every shortcut also has a Ctrl+Alt alternative that always works in DonutOS.'),
+    mount(el, h('p.hint', 'Your computer keeps some Win-key shortcuts for itself (for example Win+L and Alt+Tab). In full screen (Settings › Display), DonutOS can receive most of them; holding Esc for two seconds gives them back. Every shortcut also has an alternative that always works.'),
       [...groups].map(([g, list]) => [section(g), h('div.panel', list.map((sc) => row(null, sc.description, null, h('div.kbd-list', sc.labels.map((l) => h('kbd', l))))))]));
   },
 
@@ -215,6 +230,7 @@ const RENDER = {
       section('Taskbar items'),
       row('globe', 'Search', null, select(s, 'taskbar.showSearch', [['hidden', 'Hide'], ['icon', 'Search icon only'], ['box', 'Search box']])),
       row('sun', 'Widgets', 'Weather and the widgets board', toggle(s, 'taskbar.showWidgets')),
+      row('view', 'Task view', 'Your windows and virtual desktops', toggle(s, 'taskbar.showTaskView')),
       section('Taskbar behaviours'),
       row('apps', 'Taskbar alignment', null, select(s, 'taskbar.alignment', [['center', 'Centre'], ['left', 'Left']], { width: 140 })),
       row('chevronDown', 'Automatically hide the taskbar', 'Point at the bottom of the screen to show it', toggle(s, 'taskbar.autoHide')),

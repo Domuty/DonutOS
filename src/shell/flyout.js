@@ -39,6 +39,7 @@ export class FlyoutHost {
 
   open(name, args) {
     if (this.current && this.current !== name) this.close();
+    this.container.dispatchEvent(new CustomEvent('flyout-opening', { detail: { name } }));
     const f = this.items.get(name);
     if (!f) return;
     this.current = name;

@@ -4,6 +4,7 @@
 // Task View and Alt+Tab on top of this.
 
 import { AppWindow } from './window.js';
+import { Snapper, ZONES } from './snap.js';
 import { showMenu } from '../ui/menu.js';
 
 const TASKBAR_H = 48;
@@ -20,8 +21,11 @@ export class WindowManager {
     this.z = 10;
     this.listeners = new Set();
     this.shownDesktop = null;    // windows minimised by "Show desktop"
+    this.desktops = null;        // VirtualDesktops, attached by the session
+    this.snapper = new Snapper(this);
+    this.dragging = false;
     this.offExit = kernel.bus.on('process:exit', ({ pid }) => this.#closeForPid(pid));
-    this.onResize = () => this.#fitToScreen();
+    this.onResize = () => this.fitToScreen();
     window.addEventListener('resize', this.onResize);
   }
 
@@ -36,6 +40,7 @@ export class WindowManager {
 
   create(proc, opts = {}) {
     const win = new AppWindow(this, proc, opts);
+    win.desktop = this.desktops?.current || null;
     proc.windows.add(win.id);
     this.windows.set(win.id, win);
     this.layer.append(win.el);
@@ -75,12 +80,21 @@ export class WindowManager {
 
   rememberBounds(win) {
     if (win.state === 'minimized') return;
-    const b = win.state === 'maximized' && win.prevBounds ? win.prevBounds : win.bounds;
+    const b = win.state === 'maximized' && win.prevBounds ? win.prevBounds : win.snap && win.preSnap ? win.preSnap : win.bounds;
     try { this.kernel.settings.set(`wm.bounds.${win.appId}`, { ...b, maximized: win.state === 'maximized' }, this.uid); } catch { /* user signed out */ }
   }
 
+  /** Windows on the current virtual desktop (or on all desktops). */
+  visibleWindows() { return this.list().filter((w) => this.isVisible(w)); }
+  isVisible(w) { return !this.desktops || w.allDesktops || w.desktop === this.desktops.current; }
+
+  dragStart(win) { this.dragging = true; this.snapper.dragStart(win); }
+  dragMove(win, ev) { this.snapper.dragMove(win, ev); }
+  dragEnd(win, ev) { this.dragging = false; this.snapper.dragEnd(win, ev); }
+
   focus(win) {
     if (!win || win.closing) return;
+    if (!this.isVisible(win)) { this.desktops.switchTo(win.desktop, { focus: win }); return; }
     if (win.state === 'minimized') { win.restore(); return; }
     this.shownDesktop = null;
     if (this.active !== win) {
@@ -101,13 +115,21 @@ export class WindowManager {
     if (this.active === win) {
       win.el.classList.remove('active');
       this.active = null;
-      const next = [...this.order].reverse().find((w) => w !== win && w.state !== 'minimized');
+      const next = [...this.order].reverse().find((w) => w !== win && w.state !== 'minimized' && this.isVisible(w));
       if (next) this.focus(next);
     }
     this.changed(win);
   }
 
+  /** Focuses the top-most window on the current desktop (after switching desktops). */
+  focusTop() {
+    const next = [...this.order].reverse().find((w) => w.state !== 'minimized' && this.isVisible(w));
+    if (next) this.focus(next);
+    else { this.active?.el.classList.remove('active'); this.active = null; this.changed(null); }
+  }
+
   removed(win) {
+    this.snapper.leave(win);
     this.windows.delete(win.id);
     this.order = this.order.filter((w) => w !== win);
     win.proc.windows.delete(win.id);
@@ -115,7 +137,7 @@ export class WindowManager {
     win.el.remove();
     if (this.active === win) {
       this.active = null;
-      const next = [...this.order].reverse().find((w) => w.state !== 'minimized');
+      const next = [...this.order].reverse().find((w) => w.state !== 'minimized' && this.isVisible(w));
       if (next) this.focus(next);
     }
     this.kernel.bus.emit('wm:closed', { uid: this.uid, id: win.id, pid: win.pid, appId: win.appId });
@@ -145,13 +167,13 @@ export class WindowManager {
       for (const w of back) if (this.windows.has(w.id)) w.restore();
       return;
     }
-    const visible = this.order.filter((w) => w.state !== 'minimized');
+    const visible = this.order.filter((w) => w.state !== 'minimized' && this.isVisible(w));
     if (!visible.length) return;
     for (const w of visible) w.minimize();
     this.shownDesktop = visible;
   }
 
-  minimizeAll() { for (const w of this.order) if (w.state !== 'minimized') w.minimize(); }
+  minimizeAll() { for (const w of this.order) if (w.state !== 'minimized' && this.isVisible(w)) w.minimize(); }
 
   closeActive() {
     if (this.active) { this.active.close(); return true; }
@@ -164,21 +186,32 @@ export class WindowManager {
   /** Right-click on a title bar / click on its icon. */
   systemMenu(win, x, y) {
     const max = win.state === 'maximized';
+    const canSnap = win.opts.resizable;
+    const desks = this.desktops?.list() || [];
     showMenu([
-      { label: 'Restore', icon: 'restart', disabled: !max, onSelect: () => win.unmaximize() },
+      { label: 'Restore', icon: 'restart', disabled: !max && !win.snap, onSelect: () => (win.snap ? this.snapper.unsnap(win) : win.unmaximize()) },
       { label: 'Minimize', icon: 'minus', disabled: !win.opts.minimizable, onSelect: () => win.minimize() },
-      { label: 'Maximize', icon: 'chevronUp', disabled: max || !win.opts.maximizable || !win.opts.resizable, onSelect: () => win.maximize() },
+      { label: 'Maximize', icon: 'chevronUp', disabled: max || !win.opts.maximizable || !canSnap, onSelect: () => win.maximize() },
       { separator: true },
-      { label: 'Close', icon: 'close', onSelect: () => win.close() },
+      { label: 'Snap left', icon: 'arrowLeft', hint: 'Win+←', disabled: !canSnap, onSelect: () => this.snapper.snap(win, ZONES.left, { assist: true }) },
+      { label: 'Snap right', icon: 'arrowRight', hint: 'Win+→', disabled: !canSnap, onSelect: () => this.snapper.snap(win, ZONES.right, { assist: true }) },
+      ...(this.desktops ? [
+        { separator: true },
+        ...desks.filter((d) => d.id !== win.desktop).map((d) => ({ label: `Move to ${d.name}`, icon: 'view', onSelect: () => this.desktops.moveWindow(win, d.id) })),
+        { label: 'Move to a new desktop', icon: 'plus', onSelect: () => this.desktops.moveWindow(win, this.desktops.create().id) },
+        { label: 'Show this window on all desktops', checked: win.allDesktops, onSelect: () => this.desktops.setAllDesktops(win, !win.allDesktops) },
+      ] : []),
+      { separator: true },
+      { label: 'Close', icon: 'close', hint: 'Alt+F4', onSelect: () => win.close() },
     ], { x, y });
   }
 
   /** Keeps windows on screen after the browser window / display changes size. */
-  #fitToScreen() {
+  fitToScreen() {
     const a = this.workArea();
     for (const w of this.windows.values()) {
       if (w.state === 'maximized') { w.bounds = { x: a.x, y: a.y, w: a.w, h: a.h }; w.apply(); w.emit('resize', w.getBounds()); }
-      else w.setBounds(w.bounds, { save: false });
+      else if (!this.snapper.refit(w)) w.setBounds(w.bounds, { save: false });
     }
   }
 
