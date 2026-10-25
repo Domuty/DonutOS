@@ -12,8 +12,9 @@ const INVOKE = new Set([
   'display:setFullscreen',
   'host:importFiles', 'host:exportFile', 'host:openExternal',
   'updates:status', 'updates:check', 'updates:install',
+  'capture:screen',
 ]);
-const EVENTS = new Set(['updates:status', 'display:fullscreen']);
+const EVENTS = new Set(['updates:status', 'display:fullscreen', 'shell:closeRequest']);
 
 const config = ipcRenderer.sendSync('app:config');
 let fullscreen = !!config.fullscreen;

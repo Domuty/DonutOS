@@ -1,0 +1,60 @@
+/* Application windows. Mica: windows show a softly blurred copy of the wallpaper
+   (--mica, set per session) aligned to the screen, tinted by the theme. */
+
+.windows-layer { position: absolute; inset: 0; pointer-events: none; z-index: 2; }
+.windows-layer > * { pointer-events: auto; }
+
+.win {
+  --tint: rgba(32, 28, 38, 0.86);
+  --tint-inactive: rgba(32, 28, 38, 0.97);
+  position: absolute; left: 0; top: 0; display: flex; flex-direction: column;
+  border-radius: var(--radius); overflow: hidden; color: var(--text); outline: none;
+  background: linear-gradient(var(--tint-inactive), var(--tint-inactive)), var(--surface-solid);
+  box-shadow: 0 0 0 1px var(--border-strong), 0 8px 24px rgba(0, 0, 0, .28);
+  transform-origin: 0 0; contain: layout paint; will-change: transform;
+  transition: box-shadow .2s;
+}
+:root[data-theme="light"] .win { --tint: rgba(243, 243, 246, 0.84); --tint-inactive: rgba(243, 243, 246, 0.97); }
+.win.active {
+  background: linear-gradient(var(--tint), var(--tint)), var(--mica, none) var(--mx, 0) var(--my, 0) / 100vw 100vh no-repeat, var(--surface-solid);
+  box-shadow: 0 0 0 1px var(--border-strong), 0 16px 48px rgba(0, 0, 0, .42);
+}
+:root[data-transparency="off"] .win, :root[data-transparency="off"] .win.active { background: var(--surface-solid); }
+.win.maximized { border-radius: 0; box-shadow: none; }
+.win.moving, .win.resizing { transition: none; }
+.win.moving .win-body, .win.resizing .win-body { pointer-events: none; }
+.win[hidden] { display: none; }
+
+.win-titlebar { flex: none; display: flex; align-items: center; height: 40px; padding-left: 12px; gap: 10px; min-width: 0; touch-action: none; }
+.win-icon { width: 16px; height: 16px; flex: none; border-radius: 3px; }
+.win-title { font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--text); }
+.win:not(.active) .win-title, .win:not(.active) .win-icon { opacity: .55; }
+.win-tb-slot { flex: 1; min-width: 0; height: 100%; display: flex; align-items: center; }
+.win-controls { flex: none; display: flex; height: 100%; align-self: flex-start; }
+.win-btn { width: 46px; height: 32px; border: 0; background: none; color: var(--text); display: grid; place-items: center; cursor: default; transition: background .1s; }
+.win-btn:hover { background: var(--hover); }
+.win-btn:active { background: var(--press); }
+.win-close:hover { background: #c42b1c; color: #fff; }
+.win-close:active { background: #b52a1c; color: #fff; }
+.win:not(.active) .win-btn { color: var(--text-3); }
+.win-body { flex: 1; min-height: 0; position: relative; overflow: hidden; display: flex; flex-direction: column; }
+
+.rz { position: absolute; z-index: 5; }
+.rz-n, .rz-s { left: 8px; right: 8px; height: 6px; cursor: ns-resize; }
+.rz-n { top: -2px; } .rz-s { bottom: -2px; }
+.rz-e, .rz-w { top: 8px; bottom: 8px; width: 6px; cursor: ew-resize; }
+.rz-e { right: -2px; } .rz-w { left: -2px; }
+.rz-ne, .rz-nw, .rz-se, .rz-sw { width: 12px; height: 12px; }
+.rz-ne { right: -2px; top: -2px; cursor: nesw-resize; } .rz-sw { left: -2px; bottom: -2px; cursor: nesw-resize; }
+.rz-nw { left: -2px; top: -2px; cursor: nwse-resize; } .rz-se { right: -2px; bottom: -2px; cursor: nwse-resize; }
+.win.maximized .rz { display: none; }
+
+.win-snapshot { border-radius: 4px; box-shadow: 0 0 0 1px var(--border); }
+
+/* Common app chrome */
+.app-toolbar { flex: none; display: flex; align-items: center; gap: 4px; padding: 4px 8px; border-bottom: 1px solid var(--border); }
+.app-toolbar .btn { min-height: 30px; }
+.app-status { flex: none; display: flex; align-items: center; gap: 16px; padding: 4px 12px; font-size: 12px; color: var(--text-2); border-top: 1px solid var(--border); }
+.app-content { flex: 1; min-height: 0; overflow: auto; }
+.empty-state { display: grid; place-items: center; align-content: center; gap: 10px; height: 100%; color: var(--text-2); text-align: center; padding: 24px; }
+.empty-state .ic { color: var(--text-3); }

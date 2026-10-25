@@ -89,6 +89,7 @@ html, body {
 #root { position: fixed; inset: 0; overflow: hidden; }
 
 button, input, select, textarea { font: inherit; color: inherit; }
+[hidden] { display: none !important; }
 input, textarea, [contenteditable] { user-select: text; -webkit-user-select: text; }
 :focus { outline: none; }
 :focus-visible { outline: 2px solid var(--text); outline-offset: 2px; border-radius: var(--radius-s); }

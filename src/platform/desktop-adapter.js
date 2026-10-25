@@ -70,6 +70,11 @@ export function createDesktopAdapter(native = window.donutNative) {
     power: {
       shutdown: async () => { await call('power:shutdown'); return true; },
       restart: () => call('power:restart'),
+      onCloseRequest: (cb) => native.on('shell:closeRequest', cb),
+    },
+
+    capture: {
+      screen: () => call('capture:screen'),
     },
 
     display: {

@@ -142,6 +142,22 @@ export function createWebAdapter({ dbName = DB_NAME } = {}) {
         return window.closed;
       },
       async restart() { location.reload(); },
+      // A web page cannot intercept the browser closing it, so this never fires on the web.
+      onCloseRequest: () => () => {},
+    },
+
+    capture: {
+      async screen() {
+        const stream = await navigator.mediaDevices.getDisplayMedia({
+          video: { displaySurface: 'browser', frameRate: 5 }, audio: false,
+          preferCurrentTab: true, selfBrowserSurface: 'include', surfaceSwitching: 'exclude', monitorTypeSurfaces: 'exclude',
+        });
+        try {
+          return await grabFrame(stream);
+        } finally {
+          stream.getTracks().forEach((t) => t.stop());
+        }
+      },
     },
 
     display: fullscreenApi(),
@@ -210,4 +226,22 @@ export function createWebAdapter({ dbName = DB_NAME } = {}) {
     },
   };
   return adapter;
+}
+
+/** Draws the first real frame of a screen-capture stream to a PNG. */
+async function grabFrame(stream) {
+  const video = document.createElement('video');
+  video.muted = true;
+  video.srcObject = stream;
+  await video.play();
+  // Wait for a frame that has actually been rendered (the first can be blank).
+  await new Promise((r) => (video.requestVideoFrameCallback ? video.requestVideoFrameCallback(() => r()) : setTimeout(r, 200)));
+  await new Promise((r) => setTimeout(r, 120));
+  const canvas = document.createElement('canvas');
+  canvas.width = video.videoWidth;
+  canvas.height = video.videoHeight;
+  canvas.getContext('2d').drawImage(video, 0, 0);
+  video.srcObject = null;
+  const blob = await new Promise((r) => canvas.toBlob(r, 'image/png'));
+  return { data: new Uint8Array(await blob.arrayBuffer()), width: canvas.width, height: canvas.height };
 }

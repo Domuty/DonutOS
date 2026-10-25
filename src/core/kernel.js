@@ -10,6 +10,8 @@ import { NotificationService } from './notifications.js';
 import { ProcessManager } from './process-manager.js';
 import { VirtualFileSystem, HOME_FOLDERS } from './vfs.js';
 import { AccountService, GUEST_ID } from './accounts.js';
+import { ShortcutRegistry } from './shortcuts.js';
+import { ClipboardHistory } from './clipboard.js';
 import { PermissionError, ProcessError } from './errors.js';
 import { log } from './log.js';
 import * as P from './path.js';
@@ -32,6 +34,9 @@ export class Kernel {
     this.accounts = new AccountService({ kv: platform.kv, fs: this.fs, settings: this.settings, bus: this.bus });
     this.session = { user: null };   // the active (foreground) user
     this.sessions = new Map();       // uid -> { user, startedAt } for everyone signed in
+    this.shortcuts = new ShortcutRegistry();
+    this.clipboard = new ClipboardHistory({ settings: this.settings, bus: this.bus });
+    this.windowHost = null;          // set by the shell: (uid) => WindowManager
     this.booted = false;
     this.bootTime = null;
     this.info = null;
@@ -84,7 +89,11 @@ export class Kernel {
     for (const f of failed) log.warn('kernel', `Installed app "${f.id}" could not be loaded: ${f.error}`);
   }
 
+  /** The shell tells the kernel how to reach each user's window manager. */
+  setWindowHost(fn) { this.windowHost = fn; }
+
   #startServices() {
+    this.#routeNotifications();
     this.kernelProcess = this.processes.spawnSystem({ id: 'kernel', name: 'DonutOS Kernel', icon: 'assets/brand/logo.svg' });
     this.#registerContextProviders();
     this.processes.start();
@@ -210,6 +219,23 @@ export class Kernel {
   async shutdown() { await this.prepareForPowerOff(); return this.platform.power.shutdown(); }
   async restart() { await this.prepareForPowerOff(); return this.platform.power.restart(); }
 
+  /**
+   * Clicking a notification: the app's running process gets it via ctx.onNotification();
+   * if the app isn't running it is started with { notification } in its args.
+   */
+  #routeNotifications() {
+    this.bus.on('notification:activated', (n) => {
+      if (!this.registry.has(n.appId)) return;
+      const procs = this.processes.byApp(n.appId).filter((p) => p.user === n.uid && p._notificationHandlers?.length);
+      const payload = { id: n.id, actionId: n.actionId, data: n.data, title: n.title };
+      if (procs.length) {
+        for (const h of procs[0]._notificationHandlers) { try { procs[0].run(h, null, [payload]); } catch { /* logged */ } }
+        return;
+      }
+      this.processes.spawn(n.appId, { args: { notification: payload }, user: n.uid }).catch(() => {});
+    });
+  }
+
   // ── App context ──────────────────────────────────────────────────────
 
   #registerContextProviders() {
@@ -255,6 +281,35 @@ export class Kernel {
       await need(proc, 'notifications');
       return k.notifications.post({ ...opts, appId: proc.appId, appName: proc.name, icon: opts.icon || proc.icon, uid: proc.user });
     });
+
+    pm.provide('onNotification', (proc) => (fn) => { (proc._notificationHandlers ||= []).push(fn); });
+
+    pm.provide('windows', (proc) => Object.freeze({
+      create: (opts = {}) => {
+        const wm = k.windowHost?.(proc.user);
+        if (!wm) throw new ProcessError('ENOWM', 'No desktop is available for this app');
+        return wm.create(proc, opts);
+      },
+      list: () => (k.windowHost?.(proc.user)?.forPid(proc.pid) || []),
+    }));
+
+    pm.provide('net', (proc) => Object.freeze({
+      /** fetch() that respects the network permission and Wi-Fi/airplane mode. */
+      fetch: async (url, opts) => { await need(proc, 'network'); return fetch(url, opts); },
+      online: () => k.permissions.status(proc.appId, 'network', proc.user) !== 'blocked' && navigator.onLine,
+    }));
+
+    pm.provide('clipboard', (proc) => Object.freeze({
+      writeText: async (text) => {
+        await navigator.clipboard.writeText(String(text));
+        if (proc.user === k.session.user?.id) k.clipboard.record(String(text));
+      },
+      readText: async () => { await need(proc, 'clipboard'); return navigator.clipboard.readText(); },
+    }));
+
+    // Built-in system apps (Settings, Recycle Bin, Task Manager, File Explorer) manage the
+    // system itself, so they get the kernel. Installed apps never do.
+    pm.provide('privileged', (proc) => (proc.app.builtin && proc.app.privileged ? k : null));
 
     pm.provide('accounts', (proc) => Object.freeze({
       current: () => k.sessions.get(proc.user)?.user || null,

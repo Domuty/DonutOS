@@ -48,7 +48,7 @@ Everything above it talks to the adapter interface (`src/platform/adapter.js`), 
 
 ## Folder tree
 
-Files marked ✅ exist now (phases 1–2). The rest are created in the phase shown.
+Files marked ✅ exist now (phases 1–3). The rest are created in the phase shown.
 
 ```
 donutos/
@@ -66,6 +66,8 @@ donutos/
 │   ├── build-precache.js        ✅ writes src/precache-manifest.js (offline file list + version)
 │   ├── build-icons.js           ✅ renders the logo to PNG icons
 │   ├── build-wallpapers.js      ✅ renders the original wallpapers to JPEG
+│   ├── build-app-icons.js       ✅ generates the app and file-type icons (SVG)
+│   ├── build-emoji.js           ✅ builds the emoji list from emojibase-data (MIT)
 │   └── vendor.js                ✅ copies JSZip into src/vendor
 ├── .github/workflows/
 │   └── release.yml              9  builds Windows/macOS/Linux installers and publishes a Release
@@ -90,14 +92,17 @@ donutos/
     ├── assets/
     │   ├── brand/               ✅ logo.svg + PNG icons
     │   ├── wallpapers/          ✅ 6 original wallpapers + thumbnails
-    │   ├── icons/               3  app, file-type and system icons (SVG)
+    │   ├── icons/               ✅ app and file-type icons (SVG); system glyphs live in ui/icons.js
 
     ├── styles/
     │   ├── base.css             ✅ design tokens
     │   ├── kernel-console.css   ✅
     │   ├── shell.css            ✅ boot, lock, sign-in, setup, power, session frame
     │   ├── controls.css         ✅ buttons, inputs, toggles, menus, dialogs, spinner
-    │   └── window.css           4
+    │   ├── window.css           ✅ windows (Mica, title bars, resize handles)
+    │   ├── taskbar.css          ✅ taskbar, Start, Search, Quick Settings, notifications, widgets, emoji
+    │   ├── desktop.css          ✅ desktop icons
+    │   └── apps.css             ✅ built-in apps
     ├── platform/
     │   ├── adapter.js           ✅ THE interface + assertAdapter()
     │   ├── index.js             ✅ picks the adapter (the only platform check in /src)
@@ -119,29 +124,31 @@ donutos/
     │   ├── path.js, mime.js, errors.js, log.js, util.js ✅
     │   ├── accounts.js          ✅ accounts, guest, lockout, admin rules
     │   ├── crypto.js            ✅ PBKDF2-SHA-256 password/PIN hashing (WebCrypto)
-    │   ├── clipboard.js         3  clipboard history
-    │   └── shortcuts.js         3  global keyboard shortcut registry
+    │   ├── clipboard.js         ✅ clipboard history
+    │   └── shortcuts.js         ✅ keyboard shortcut registry (Win-key + Ctrl+Alt alternatives)
     ├── shell/
     │   ├── shell.js             ✅ screen state machine, sessions, shortcuts, auto-lock
     │   ├── boot-screen.js, lock-screen.js, sign-in.js, oobe.js  ✅
     │   ├── power.js             ✅ sleep, shut down, restart, sign out (with screens)
-    │   ├── session-view.js      ✅ per-user screen (replaced by desktop/taskbar in 3)
-    │   ├── accounts-panel.js, personalize-panel.js  ✅ (embedded in Settings in 5)
+    │   ├── session-view.js      ✅ one user's screen: wallpaper, desktop, windows, taskbar, flyouts
+    │   ├── accounts-panel.js    ✅ (embedded in Settings › Accounts)
     │   ├── permission-prompt.js ✅
     │   ├── theme.js, wallpaper.js, sounds.js, format.js, status-icons.js, prefs.js  ✅
-    │   ├── desktop.js, taskbar.js, start-menu.js, search.js      3
-    │   ├── quick-settings.js, notification-center.js, toasts.js  3
-    │   ├── widgets.js, calendar-flyout.js, run-dialog.js         3
-    │   ├── emoji-panel.js, clipboard-panel.js, snipping.js       3
-    │   ├── context-menu.js                                       3
-    │   └── display-filters.js   3  brightness, night light, high contrast, magnifier
-    ├── wm/                      4
-    │   ├── window-manager.js, window.js, snap.js, snap-layouts.js
-    │   ├── virtual-desktops.js, task-view.js, alt-tab.js
+    │   ├── desktop.js, file-ops.js, file-icons.js                ✅
+    │   ├── taskbar.js, start-menu.js, search.js, flyout.js, apps.js  ✅
+    │   ├── quick-settings.js, notification-center.js (+ calendar), toasts.js  ✅
+    │   ├── widgets.js, weather.js (Open-Meteo), run-dialog.js, focus.js  ✅
+    │   ├── clipboard-panel.js, emoji-data.js, snip.js            ✅
+    │   └── display-filters.js   ✅ brightness, night light (high contrast & magnifier: 8)
+    ├── wm/
+    │   ├── window-manager.js, window.js  ✅ windows, focus, z-order, previews, remembered bounds
+    │   ├── snap.js, snap-layouts.js      4
+    │   ├── virtual-desktops.js, task-view.js, alt-tab.js  4
     ├── ui/                      ✅ h.js (DOM helper), icons.js, avatar.js, dialog.js, menu.js
     ├── apps/
     │   ├── index.js             ✅ built-in manifest list (filled as apps arrive)
-    │   ├── explorer/ terminal/ settings/ taskmanager/                         5
+    │   ├── settings/ recyclebin/ snipping/ console/                           ✅
+    │   ├── explorer/ terminal/ taskmanager/                                   5
     │   ├── notepad/ writer/ calculator/ paint/ photos/ mediaplayer/           6
     │   ├── camera/ recorder/ clock/ calendar/ stickynotes/ browser/ mail/     6
     │   ├── solitaire/ minesweeper/                                            6
@@ -166,11 +173,12 @@ Defined (with exact return shapes) in [`src/platform/adapter.js`](../src/platfor
 | `host` | `importFiles`, `exportFile`, `openExternal` |
 | `updates` | `status`, `check`, `install`, `onStatus` |
 
-Two more groups land with the apps that need them, each implemented for both hosts:
-- `browser` (phase 6): creates a page view (sandboxed `<iframe>` on the web, a separate
-  `WebContentsView` on the desktop so sites that refuse iframes still load).
-- `capture` (phase 3): screenshots for the snipping tool (`getDisplayMedia` on the web,
-  `webContents.capturePage` on the desktop, which needs no screen-share prompt).
+| `capture` | `screen` — the web build uses `getDisplayMedia` (the browser asks each time); the desktop build uses `webContents.capturePage` (no prompt) |
+
+`power.onCloseRequest` lets the desktop build turn Alt+F4 / the host close button into
+"close the active app window, or offer to shut down", like a desktop OS. One more group lands
+with the app that needs it: `browser` (phase 6) — a sandboxed `<iframe>` on the web, a
+`WebContentsView` on the desktop so sites that refuse iframes still load.
 
 The fs primitives are deliberately small; `core/vfs.js` builds everything else (recursive
 mkdir, overwrite-aware move, unique names, search, the Recycle Bin) once, for both platforms.
@@ -266,7 +274,24 @@ notifications silent (stored, no toast), per-app mute.
 | `accounts.current/list` | who the app runs as, and the device's accounts (no secrets) | — |
 | `host.importFiles/exportFile/openExternal` | the real computer | `openExternal`: `network` |
 | `power.shutdown/restart` | power | `system.power` |
-| `windows.*` (phase 4), `ui.*` (phase 3) | windows, dialogs, menus | — |
+| `windows.create(opts)` → `{ body, titlebar, setTitle, setIcon, focus, minimize, maximize, restore, close, setBounds, getBounds, center, on, onBeforeClose, flash, setProgress }` | a window (closing the last one ends the app unless `keepAlive`) | — |
+| `net.fetch(url, opts)`, `net.online()` | internet access that obeys Wi-Fi/airplane mode | `network` |
+| `clipboard.writeText / readText` | system clipboard (+ clipboard history) | read: `clipboard` |
+| `onNotification(fn)` | clicks on the app's notifications (if not running, the app is started with `args.notification`) | — |
+| `privileged` | the kernel itself — only for built-in apps marked `privileged` (Settings, Recycle Bin, Snipping Tool, Kernel Console) | — |
+
+## Shell (phase 3)
+
+Each signed-in user's `SessionView` owns a `WindowManager`, a `FlyoutHost` (Start, Search,
+Quick Settings, Notification Center + calendar, Widgets — one open at a time), the clipboard/emoji
+panel, toasts, the taskbar and the desktop. Keyboard shortcuts are registered once in
+`shell.js` with `kernel.shortcuts`; each has the Win-key combination and a Ctrl+Alt alternative
+(Settings › System › Keyboard shortcuts lists them all).
+
+Quick Settings maps to real behaviour: Wi-Fi off / airplane mode take DonutOS offline (the
+`network` permission becomes *blocked*, the weather stops refreshing); Bluetooth gates Bluetooth
+for apps; brightness and night light are screen-wide filters; volume drives every DonutOS sound;
+focus is a timed do-not-disturb.
 
 ## Security notes (desktop)
 

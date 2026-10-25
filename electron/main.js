@@ -36,6 +36,7 @@ let win = null;
 let sandbox = null;
 let kv = null;
 let updater = null;
+let allowClose = false; // set when DonutOS itself (or the OS) really wants to quit
 const send = (channel, payload) => { if (win && !win.isDestroyed()) win.webContents.send(channel, payload); };
 
 /** Registers an IPC handler that only answers DonutOS itself and wraps results/errors. */
@@ -64,8 +65,14 @@ function registerIpc() {
   handle('system:stats', () => systemStats.stats(SANDBOX_ROOT));
   handle('system:network', () => systemStats.network());
 
-  handle('power:shutdown', async () => { await kv.flush(); setImmediate(() => app.quit()); });
-  handle('power:restart', async () => { await kv.flush(); setImmediate(() => { app.relaunch(); app.exit(0); }); });
+  handle('power:shutdown', async () => { await kv.flush(); allowClose = true; setImmediate(() => app.quit()); });
+  handle('power:restart', async () => { await kv.flush(); allowClose = true; setImmediate(() => { app.relaunch(); app.exit(0); }); });
+
+  handle('capture:screen', async () => {
+    const img = await win.webContents.capturePage();
+    const size = img.getSize();
+    return { data: new Uint8Array(img.toPNG()), width: size.width, height: size.height };
+  });
 
   handle('display:setFullscreen', (on) => { win.setFullScreen(!!on); return !!on; });
 
@@ -182,6 +189,13 @@ function createWindow() {
   win.webContents.on('will-navigate', (e, url) => { if (!url.startsWith(ORIGIN + '/')) e.preventDefault(); });
 
   win.loadURL(`${ORIGIN}/${TESTS ? 'tests/index.html' : 'index.html'}`);
+  // Alt+F4 / the window's close button: like a desktop OS, DonutOS decides (close the
+  // active app window, or offer to shut down) instead of the host killing it.
+  win.on('close', (e) => {
+    if (allowClose || TESTS) return;
+    e.preventDefault();
+    send('shell:closeRequest', {});
+  });
   win.on('closed', () => { win = null; });
 }
 
@@ -203,5 +217,5 @@ app.whenReady().then(() => {
   }
 });
 
-app.on('before-quit', () => { if (kv) kv.flush(); });
+app.on('before-quit', () => { allowClose = true; if (kv) kv.flush(); });
 app.on('window-all-closed', () => app.quit());

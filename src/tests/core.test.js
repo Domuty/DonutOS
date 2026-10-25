@@ -676,6 +676,74 @@ test('sessions: the guest starts clean every time', async () => {
   await kernel.signIn(USER);
 });
 
+// ── Phase 3 services ──────────────────────────────────────────────────
+
+import { normalizeCombo, comboFromEvent, ShortcutRegistry } from '../core/shortcuts.js';
+
+test('shortcuts: combos are normalised and dispatched', () => {
+  assert.equal(normalizeCombo('alt+ctrl+e'), 'Ctrl+Alt+E');
+  assert.equal(normalizeCombo('Win+.'), 'Meta+Period');
+  assert.equal(comboFromEvent(new KeyboardEvent('keydown', { code: 'KeyE', key: 'e', ctrlKey: true, altKey: true })), 'Ctrl+Alt+E');
+  const reg = new ShortcutRegistry();
+  const target = new EventTarget();
+  let hits = 0;
+  reg.register('t', { keys: ['Meta+E', 'Ctrl+Alt+E'], handler: () => { hits++; } });
+  reg.attach(target);
+  target.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyE', key: 'e', ctrlKey: true, altKey: true }));
+  target.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyE', key: 'e', metaKey: true }));
+  target.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyE', key: 'e' }));
+  assert.equal(hits, 2);
+  // Pressing and releasing Meta alone is its own shortcut (Start).
+  let start = 0;
+  reg.register('s', { keys: ['Meta'], handler: () => { start++; } });
+  target.dispatchEvent(new KeyboardEvent('keydown', { key: 'Meta', code: 'MetaLeft', metaKey: true }));
+  target.dispatchEvent(new KeyboardEvent('keyup', { key: 'Meta', code: 'MetaLeft' }));
+  target.dispatchEvent(new KeyboardEvent('keydown', { key: 'Meta', code: 'MetaLeft', metaKey: true }));
+  target.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyE', key: 'e', metaKey: true }));
+  target.dispatchEvent(new KeyboardEvent('keyup', { key: 'Meta', code: 'MetaLeft' }));
+  assert.equal(start, 1, 'Meta used in a combination does not open Start');
+  reg.detach();
+});
+
+test('clipboard history: dedupes, pins and clears', async () => {
+  await kernel.signIn(USER);
+  const c = kernel.clipboard;
+  c.clear(); for (const i of c.list()) c.remove(i.id);
+  c.record('one'); c.record('two'); c.record('one');
+  assert.deepEqual(c.list().map((i) => i.text), ['one', 'two']);
+  c.pin(c.list().find((i) => i.text === 'two').id);
+  c.clear();
+  assert.deepEqual(c.list().map((i) => i.text), ['two'], 'pinned items survive');
+  kernel.settings.set('privacy.clipboardHistory', false);
+  c.record('secret');
+  assert.ok(!c.list().some((i) => i.text === 'secret'), 'nothing recorded when off');
+  kernel.settings.set('privacy.clipboardHistory', true);
+});
+
+test('Wi-Fi off / airplane mode blocks network access for apps', async () => {
+  const m = kernel.registry.register(app('netapp', { permissions: ['network'], module: { default() {} } }), { builtin: true });
+  assert.equal(kernel.permissions.status(m.id, 'network'), 'granted');
+  kernel.settings.set('qs.airplane', true);
+  assert.equal(kernel.permissions.status(m.id, 'network'), 'blocked');
+  kernel.settings.set('qs.airplane', false);
+  kernel.settings.set('qs.wifi', false);
+  assert.equal(await kernel.permissions.request(m.id, 'network'), false);
+  kernel.settings.set('qs.wifi', true);
+  assert.equal(kernel.permissions.status(m.id, 'network'), 'granted');
+});
+
+test('apps get windows from the window host; closing the last window ends the app', async () => {
+  const created = [];
+  const fakeWm = { create: (proc, opts) => { const w = { proc, opts }; created.push(w); return w; }, forPid: () => [] };
+  kernel.setWindowHost((uid) => (uid === USER.id ? fakeWm : null));
+  const m = kernel.registry.register(app('windowed', { module: { default(ctx) { ctx.windows.create({ title: 'Hello' }); } } }));
+  const p = await kernel.launch(m.id);
+  assert.equal(created.length, 1);
+  assert.equal(created[0].opts.title, 'Hello');
+  await kernel.processes.kill(p.pid);
+  kernel.setWindowHost(null);
+});
+
 test('signing out ends the user\'s apps', async () => {
   const m = kernel.registry.register(app('lingering', { module: { default() {} } }));
   await kernel.launch(m.id);

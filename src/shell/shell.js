@@ -13,7 +13,13 @@ import { showSignIn } from './sign-in.js';
 import { showOobe } from './oobe.js';
 import { Power } from './power.js';
 import { SessionView } from './session-view.js';
-import { applyTheme, watchTheme } from './theme.js';
+import { applyTheme, watchTheme, resolvedTheme } from './theme.js';
+import { DisplayFilters } from './display-filters.js';
+import { toggleFocus } from './focus.js';
+import { launchApp } from './apps.js';
+import { runDialog } from './run-dialog.js';
+import { snipToClipboard, fullScreenshot } from './snip.js';
+import { dialog } from '../ui/dialog.js';
 import { installPermissionPrompt } from './permission-prompt.js';
 import { playSound } from './sounds.js';
 import { closeMenu } from '../ui/menu.js';
@@ -30,7 +36,12 @@ export class Shell {
     this.lockUi = null;       // current lock or sign-in screen
     this.power = new Power(this);
     this.lastInput = Date.now();
+    kernel.setWindowHost((uid) => this.views.get(uid)?.wm || null);
   }
+
+  get view() { return this.views.get(this.kernel.session.user?.id) || null; }
+  inSession() { return !!this.kernel.session.user && !this.lockUi && !!this.view; }
+  resolvedTheme() { return resolvedTheme(this.kernel.settings.currentUser ? this.kernel.settings : null); }
 
   async start() {
     applyTheme(null);
@@ -38,8 +49,12 @@ export class Shell {
     installPermissionPrompt(this.kernel);
     watchTheme(this.kernel.settings);
     this.kernel.bus.on('session:changed', () => applyTheme(this.kernel.settings));
+    this.filters = new DisplayFilters(this.kernel, this.root);
     this.#installShortcuts();
     this.#installAutoLock();
+    this.#installFocusTimer();
+    this.#installClipboardCapture();
+    this.kernel.platform.power.onCloseRequest(() => this.#closeRequest());
     if (this.kernel.accounts.count === 0) {
       await this.#firstRun();
     } else {
@@ -110,8 +125,11 @@ export class Shell {
     const user = await this.kernel.signIn(account);
     for (const [uid, v] of this.views) if (uid !== user.id) v.hide();
     let view = this.views.get(user.id);
-    if (!view) { view = new SessionView(this, user); this.views.set(user.id, view); }
-    else view.show();
+    if (!view) {
+      view = new SessionView(this, user);
+      this.views.set(user.id, view);
+      for (const appId of this.kernel.settings.get('apps.startup')) if (this.kernel.registry.has(appId)) launchApp(this.kernel, appId, { startup: true });
+    } else view.show();
     view.setInert(false);
     applyTheme(this.kernel.settings);
     if (wasRunning) playSound('unlock', this.kernel.settings);
@@ -137,15 +155,93 @@ export class Shell {
 
   // ── Input ────────────────────────────────────────────────────────────
 
+  // Each shortcut has the familiar Win-key combination and a Ctrl+Alt alternative, because
+  // host operating systems keep many Win-key combinations for themselves.
   #installShortcuts() {
-    document.addEventListener('keydown', (e) => {
-      const inSession = this.kernel.session.user && !this.lockUi;
-      // Lock: Win+L where the host OS lets it through, Ctrl+Alt+L everywhere.
-      if (inSession && e.code === 'KeyL' && ((e.metaKey && !e.ctrlKey) || (e.ctrlKey && e.altKey))) {
-        e.preventDefault();
-        this.lock();
-      }
+    const k = this.kernel;
+    const sc = k.shortcuts;
+    const when = () => this.inSession();
+    const fly = (name, args) => () => this.view.flyouts.toggle(name, args);
+    const wm = () => this.view.wm;
+    const add = (id, keys, description, handler, group = 'Shell', extra = {}) => sc.register(id, { keys, description, handler, when, group, ...extra });
+    add('shell.start', ['Meta', 'Ctrl+Escape'], 'Open or close Start', fly('start'));
+    add('shell.search', ['Meta+S', 'Meta+Q', 'Ctrl+Alt+S'], 'Search', fly('search'));
+    add('shell.quickSettings', ['Meta+A', 'Ctrl+Alt+A'], 'Quick Settings', fly('qs'));
+    add('shell.notifications', ['Meta+N', 'Ctrl+Alt+N'], 'Notifications and calendar', fly('nc'));
+    add('shell.widgets', ['Meta+W', 'Ctrl+Alt+W'], 'Widgets', fly('widgets'));
+    add('shell.clipboard', ['Meta+V', 'Ctrl+Alt+V'], 'Clipboard history', () => this.view.clipboard.openFor('clipboard'));
+    add('shell.emoji', ['Meta+Period', 'Ctrl+Alt+Period'], 'Emoji panel', () => this.view.clipboard.openFor('emoji'));
+    add('shell.run', ['Meta+R', 'Ctrl+Alt+R'], 'Run', () => runDialog(k, this.view));
+    add('shell.lock', ['Meta+L', 'Ctrl+Alt+L'], 'Lock', () => this.lock());
+    add('shell.settings', ['Meta+I', 'Ctrl+Alt+I'], 'Settings', () => launchApp(k, 'settings'));
+    add('shell.explorer', ['Meta+E', 'Ctrl+Alt+E'], 'File Explorer', () => launchApp(k, 'explorer'), 'Shell', { when: () => when() && k.registry.has('explorer') });
+    add('shell.taskmanager', ['Ctrl+Shift+Escape', 'Ctrl+Alt+K'], 'Task Manager', () => launchApp(k, 'taskmanager'), 'Shell', { when: () => when() && k.registry.has('taskmanager') });
+    add('shell.snip', ['Meta+Shift+S', 'Ctrl+Alt+Shift+S'], 'Screenshot of part of the screen', () => snipToClipboard(k, this.view));
+    add('shell.printScreen', ['PrintScreen'], 'Screenshot of the whole screen', () => fullScreenshot(k, this.view));
+    add('wm.desktop', ['Meta+D', 'Ctrl+Alt+D'], 'Show the desktop', () => wm().toggleDesktop(), 'Windows');
+    add('wm.minimizeAll', ['Meta+M', 'Ctrl+Alt+M'], 'Minimize all windows', () => wm().minimizeAll(), 'Windows');
+    add('wm.close', ['Alt+F4', 'Ctrl+Alt+Q'], 'Close the active window', () => this.#closeRequest(), 'Windows', { inInputs: true });
+    add('wm.maximize', ['Meta+ArrowUp', 'Ctrl+Alt+ArrowUp'], 'Maximize the active window', () => wm().active?.maximize(), 'Windows');
+    add('wm.restore', ['Meta+ArrowDown', 'Ctrl+Alt+ArrowDown'], 'Restore / minimize the active window', () => { const a = wm().active; if (!a) return; if (a.state === 'maximized') a.unmaximize(); else a.minimize(); }, 'Windows');
+    for (let i = 1; i <= 9; i++) {
+      add(`taskbar.app${i}`, [`Meta+${i}`, `Ctrl+Alt+${i}`], `Open taskbar app ${i}`, () => {
+        const item = this.view.taskbar.items()[i - 1];
+        if (!item) return;
+        const btn = this.view.taskbar.appsEl.querySelector(`[data-app="${CSS.escape(item.appId)}"]`);
+        this.view.taskbar.activate(item, item.windows, { shiftKey: false, currentTarget: btn });
+      }, 'Taskbar');
+    }
+    sc.attach(window);
+  }
+
+  /** Alt+F4 / the host window's close button: close the active window, or offer power options. */
+  async #closeRequest() {
+    if (this.inSession() && this.view.wm.closeActive()) return;
+    if (document.querySelector('.dlg')) return;
+    const choice = await dialog({
+      title: 'Shut down DonutOS',
+      body: h('p', 'What do you want DonutOS to do?'),
+      cancelValue: null,
+      buttons: [
+        { label: 'Shut down', value: 'shutdown', primary: true },
+        { label: 'Restart', value: 'restart' },
+        ...(this.kernel.session.user ? [{ label: 'Sign out', value: 'signout' }] : []),
+        { label: 'Cancel', value: null },
+      ],
     });
+    if (choice === 'shutdown') this.power.shutdown();
+    else if (choice === 'restart') this.power.restart();
+    else if (choice === 'signout') this.power.signOut();
+  }
+
+  /** Focus sessions: Do-not-disturb for a set time, then a notification. */
+  toggleFocus() { toggleFocus(this.kernel.settings); }
+
+  #installFocusTimer() {
+    setInterval(() => {
+      for (const uid of this.kernel.settings.loadedUsers()) {
+        const s = this.kernel.settings.forUser(uid);
+        if (s.get('qs.focus') && s.get('qs.focusUntil') && Date.now() >= s.get('qs.focusUntil')) {
+          s.set('qs.focus', false);
+          s.set('qs.focusUntil', 0);
+          this.kernel.notifications.post({ appId: 'shell', appName: 'Focus', title: 'Focus session complete', body: 'Nice work! Take a short break.', uid, urgent: true });
+        }
+      }
+    }, 5000);
+  }
+
+  /** Clipboard history: remember text the active user copies anywhere in DonutOS. */
+  #installClipboardCapture() {
+    const record = () => {
+      if (!this.inSession()) return;
+      const el = document.activeElement;
+      let text = '';
+      if (el && /^(INPUT|TEXTAREA)$/.test(el.tagName) && typeof el.selectionStart === 'number' && el.type !== 'password') text = el.value.slice(el.selectionStart, el.selectionEnd);
+      else if (el?.type !== 'password') text = String(getSelection() || '');
+      if (text) setTimeout(() => this.kernel.clipboard.record(text));
+    };
+    document.addEventListener('copy', record, true);
+    document.addEventListener('cut', record, true);
   }
 
   /** Locks after the user's chosen idle time (Accounts › Sign-in options). */

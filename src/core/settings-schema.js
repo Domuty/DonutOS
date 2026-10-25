@@ -17,7 +17,6 @@ export const SCHEMA = {
   'system.bootAnimation':     { scope: 'system', type: 'boolean', default: true },
   'system.firstRunDone':      { scope: 'system', type: 'boolean', default: false },
   'system.updates.auto':      { scope: 'system', type: 'boolean', default: true },
-  'system.startupApps':       { scope: 'system', type: 'array', default: [] },
 
   // ── Personalization ──────────────────────────────────────────────────
   'appearance.theme':         { scope: 'user', type: 'string', default: 'dark', enum: ['light', 'dark', 'auto'] },
@@ -39,12 +38,12 @@ export const SCHEMA = {
   'taskbar.showTaskView':     { scope: 'user', type: 'boolean', default: true },
   'taskbar.showWidgets':      { scope: 'user', type: 'boolean', default: true },
   'taskbar.combine':          { scope: 'user', type: 'boolean', default: true },
-  'taskbar.pinned':           { scope: 'user', type: 'array', default: ['explorer', 'browser', 'store', 'terminal', 'settings'] },
+  'taskbar.pinned':           { scope: 'user', type: 'array', default: ['explorer', 'browser', 'store', 'terminal', 'settings', 'snipping'] },
   'taskbar.showSeconds':      { scope: 'user', type: 'boolean', default: false },
   'start.pinned':             { scope: 'user', type: 'array', default: [
     'explorer', 'browser', 'settings', 'store', 'notepad', 'terminal', 'calculator', 'photos',
     'mediaplayer', 'paint', 'calendar', 'clock', 'mail', 'writer', 'stickynotes', 'taskmanager',
-    'camera', 'solitaire', 'minesweeper', 'recorder' ] },
+    'camera', 'solitaire', 'minesweeper', 'recorder', 'snipping', 'recyclebin', 'console' ] },
   'start.showRecent':         { scope: 'user', type: 'boolean', default: true },
   'start.showRecentApps':     { scope: 'user', type: 'boolean', default: true },
   'start.recentFiles':        { scope: 'user', type: 'array', default: [] },
@@ -75,6 +74,16 @@ export const SCHEMA = {
   'qs.nightLightStrength':    { scope: 'user', type: 'number', default: 45, min: 5, max: 100 },
   'qs.focus':                 { scope: 'user', type: 'boolean', default: false },
   'qs.focusMinutes':          { scope: 'user', type: 'number', default: 30, min: 5, max: 240 },
+  'qs.focusUntil':            { scope: 'user', type: 'number', default: 0, min: 0 },
+
+  // ── Widgets ──────────────────────────────────────────────────────────
+  'widgets.todo':             { scope: 'user', type: 'array', default: [] },
+  'widgets.hidden':           { scope: 'user', type: 'array', default: [] },
+  'widgets.photosFolder':     { scope: 'user', type: 'string', default: '' },
+  'widgets.weatherCache':     { scope: 'user', type: 'object', default: null },
+  'search.web':               { scope: 'user', type: 'boolean', default: true },
+  'run.history':              { scope: 'user', type: 'array', default: [] },
+  'shortcuts.custom':         { scope: 'user', type: 'object', default: {} },
 
   // ── Sound ────────────────────────────────────────────────────────────
   'sound.enabled':            { scope: 'user', type: 'boolean', default: true },
@@ -116,6 +125,7 @@ export const SCHEMA = {
   // ── Apps & privacy ───────────────────────────────────────────────────
   'apps.defaults':            { scope: 'user', type: 'object', default: {} },
   'apps.hidden':              { scope: 'user', type: 'array', default: [] },
+  'apps.startup':             { scope: 'user', type: 'array', default: [] },
   'privacy.grants':           { scope: 'user', type: 'object', default: {} },
   'privacy.camera':           { scope: 'user', type: 'boolean', default: true },
   'privacy.microphone':       { scope: 'user', type: 'boolean', default: true },
@@ -125,6 +135,8 @@ export const SCHEMA = {
   'privacy.searchHistory':    { scope: 'user', type: 'boolean', default: true },
   'search.history':           { scope: 'user', type: 'array', default: [] },
   'clipboard.history':        { scope: 'user', type: 'array', default: [] },
+  'emoji.recent':             { scope: 'user', type: 'array', default: [] },
+  'emoji.skin':               { scope: 'user', type: 'number', default: -1, min: -1, max: 4 },
 
   // ── Per-app free-form storage ────────────────────────────────────────
   'app.*':                    { scope: 'user', type: 'any', default: null },

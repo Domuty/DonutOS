@@ -16,7 +16,7 @@ export const PERMISSIONS = Object.freeze({
   'camera':           { label: 'Camera', description: 'Use your camera.', sensitive: true, master: 'privacy.camera' },
   'microphone':       { label: 'Microphone', description: 'Use your microphone.', sensitive: true, master: 'privacy.microphone' },
   'location':         { label: 'Location', description: 'Know your approximate location.', sensitive: true, master: 'privacy.location' },
-  'network':          { label: 'Internet', description: 'Connect to the internet.', sensitive: false },
+  'network':          { label: 'Internet', description: 'Connect to the internet.', sensitive: false, offline: true },
   'clipboard':        { label: 'Clipboard', description: 'Read what you copied.', sensitive: true },
   'system.processes': { label: 'Manage apps', description: 'See and end other running apps.', sensitive: true },
   'system.settings':  { label: 'Change system settings', description: 'Change settings that affect the whole device and every user.', sensitive: true },
@@ -56,6 +56,8 @@ export class PermissionManager {
     if (!app || !(app.permissions || []).includes(perm)) return 'undeclared';
     const loaded = uid && this.#settings.isLoaded(uid);
     if (info.master && loaded && this.#settings.get(info.master, uid) === false) return 'blocked';
+    // Wi-Fi off / airplane mode in Quick Settings takes every app offline.
+    if (info.offline && loaded && (this.#settings.get('qs.airplane', uid) || !this.#settings.get('qs.wifi', uid))) return 'blocked';
     if (app.system) return 'granted';
     if (this.#onceGrants.has(`${uid}|${appId}|${perm}`)) return 'granted';
     if (!loaded) return 'prompt';

@@ -21,6 +21,8 @@
 // Network:  { online, type: 'wifi' | 'ethernet' | 'cellular' | 'none' | 'unknown',
 //             effectiveType, downlinkMbps, rttMs, interfaces: [{ name, type, address }] }
 // HostFile: { name, relativePath, type, size, lastModified, data: Uint8Array }
+// Capture:  the web build asks the browser to share the current tab (the browser shows its
+//           own prompt); the desktop build reads its own window directly (no prompt).
 // Update:   { state: 'idle' | 'checking' | 'available' | 'downloading' | 'ready' |
 //                    'up-to-date' | 'error' | 'unsupported', version, progress, message }
 
@@ -59,6 +61,11 @@ export const ADAPTER_SHAPE = {
   power: {
     shutdown: 'function',         // async () => boolean   (true if the host actually closed)
     restart: 'function',          // async () => void
+    onCloseRequest: 'function',   // (cb) => unsubscribe   (host asked to close, e.g. Alt+F4 on desktop)
+  },
+
+  capture: {
+    screen: 'function',           // async () => { data: Uint8Array (PNG), width, height }  — the DonutOS screen
   },
 
   display: {

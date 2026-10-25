@@ -1,6 +1,6 @@
 // Context / dropdown menus.
 // showMenu(items, { x, y } | { anchor, placement: 'above' | 'below' })
-// items: { label, icon, onSelect, disabled, danger } | { separator: true }
+// items: { label, icon (name or image URL), checked, onSelect, disabled, danger, hint } | { separator: true } | { header: 'Text' }
 
 import { h } from './h.js';
 import { icon as makeIcon } from './icons.js';
@@ -11,10 +11,13 @@ export function closeMenu() { open?.(); }
 
 export function showMenu(items, { x, y, anchor, placement = 'below', parent = document.body } = {}) {
   closeMenu();
-  const menu = h('div.menu', { role: 'menu' }, items.map((it) => it.separator ? h('hr') : h('button', {
+  const menu = h('div.menu', { role: 'menu' }, items.map((it) => it.separator ? h('hr') : it.header ? h('div.menu-header', it.header) : h('button', {
     role: 'menuitem', type: 'button', disabled: !!it.disabled, class: it.danger && 'danger',
     onclick: () => { close(); it.onSelect?.(); },
-  }, it.icon ? makeIcon(it.icon, { size: 16 }) : h('span', { style: { width: '16px' } }), h('span', it.label))));
+  }, it.checked !== undefined ? h('span.menu-check', it.checked ? makeIcon('check', { size: 16 }) : null)
+    : it.icon?.includes('/') ? h('img', { src: it.icon, alt: '', width: 16, height: 16 })
+    : it.icon ? makeIcon(it.icon, { size: 16 }) : h('span', { style: { width: '16px' } }),
+  h('span', { style: { flex: 1 } }, it.label), it.hint ? h('span.menu-hint', it.hint) : null)));
   parent.append(menu);
 
   const r = menu.getBoundingClientRect();
