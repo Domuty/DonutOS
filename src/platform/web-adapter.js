@@ -134,7 +134,9 @@ export function createWebAdapter({ dbName = DB_NAME } = {}) {
 
     power: {
       async shutdown() {
-        // Browsers only let scripts close windows they opened; installed PWAs usually allow it.
+        // Browsers only let a page close itself when it was opened by a script or is a
+        // fresh window with no history (an installed app window); otherwise don't try.
+        if (!(window.opener || history.length <= 1)) return false;
         window.close();
         await new Promise((r) => setTimeout(r, 300));
         return window.closed;

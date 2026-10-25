@@ -1,14 +1,4 @@
-/* Phase 1 kernel console: shown after the core boots, until the shell arrives in phase 2. */
-.kc-boot {
-  position: absolute; inset: 0; display: grid; place-items: center; align-content: center; gap: 28px;
-  background: #000;
-}
-.kc-logo { width: 112px; height: 112px; animation: kc-spin 2.4s var(--ease-out) infinite; }
-@keyframes kc-spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
-.kc-bar { width: 220px; height: 3px; border-radius: 3px; background: rgba(255,255,255,.12); overflow: hidden; }
-.kc-bar > i { display: block; height: 100%; width: 0; background: var(--accent); transition: width .25s var(--ease-out); }
-.kc-step { color: var(--text-3); font-size: 12px; min-height: 1em; }
-.kc-error { color: var(--danger); max-width: 520px; text-align: center; line-height: 1.5; }
+/* Kernel console (developer tool). */
 
 .kc {
   position: absolute; inset: 0; overflow: auto; padding: 28px clamp(16px, 4vw, 48px) 48px;
@@ -42,5 +32,3 @@
 .kc th { color: var(--text-3); font-weight: 500; }
 .kc pre { margin: 0; font-family: var(--font-mono); font-size: 12px; color: var(--text-2); white-space: pre-wrap; max-height: 260px; overflow: auto; }
 .kc .kc-note { color: var(--text-3); font-size: 12px; margin-top: 10px; line-height: 1.5; }
-.kc-power { padding: 8px 18px; border-radius: var(--radius-s); border: 1px solid var(--border); background: var(--surface-2); color: var(--text); cursor: pointer; }
-.kc-power:hover { background: rgba(255,255,255,.12); }

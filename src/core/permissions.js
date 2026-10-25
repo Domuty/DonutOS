@@ -41,100 +41,110 @@ export class PermissionManager {
   /**
    * The shell installs the dialog that asks the user. It receives
    * { appId, appName, appIcon, permission, info } and resolves to
-   * "granted" | "denied" | "once".
+   * "granted" | "denied" | "once" | "dismiss" (not answered; nothing is stored).
    */
   setPrompter(fn) { this.#prompter = fn; }
 
-  /** 'granted' | 'denied' | 'prompt' | 'undeclared' | 'blocked' (master switch off) */
-  status(appId, perm) {
+  /**
+   * 'granted' | 'denied' | 'prompt' | 'undeclared' | 'blocked' (master switch off).
+   * `uid` is the user the app runs for (default: the active user).
+   */
+  status(appId, perm, uid = this.#settings.currentUser) {
     const info = PERMISSIONS[perm];
     if (!info) return 'undeclared';
     const app = this.#registry.get(appId);
     if (!app || !(app.permissions || []).includes(perm)) return 'undeclared';
-    if (info.master && this.#settings.currentUser && this.#settings.get(info.master) === false) return 'blocked';
+    const loaded = uid && this.#settings.isLoaded(uid);
+    if (info.master && loaded && this.#settings.get(info.master, uid) === false) return 'blocked';
     if (app.system) return 'granted';
-    if (this.#onceGrants.has(`${appId}|${perm}`)) return 'granted';
-    if (!this.#settings.currentUser) return 'prompt';
-    const g = this.#settings.get('privacy.grants')[appId]?.[perm];
+    if (this.#onceGrants.has(`${uid}|${appId}|${perm}`)) return 'granted';
+    if (!loaded) return 'prompt';
+    const g = this.#settings.get('privacy.grants', uid)[appId]?.[perm];
     return g === 'granted' || g === 'denied' ? g : 'prompt';
   }
 
   /** Synchronous check that never prompts. */
-  check(appId, perm) { return this.status(appId, perm) === 'granted'; }
+  check(appId, perm, uid) { return this.status(appId, perm, uid) === 'granted'; }
 
   /** Asks the user if needed. Resolves true when the permission is granted. */
-  async request(appId, perm) {
-    const s = this.status(appId, perm);
+  async request(appId, perm, uid = this.#settings.currentUser) {
+    const s = this.status(appId, perm, uid);
     if (s === 'granted') return true;
-    if (s !== 'prompt') return false;
-    const key = `${appId}|${perm}`;
+    if (s !== 'prompt' || !uid) return false;
+    const key = `${uid}|${appId}|${perm}`;
     if (this.#pending.has(key)) return this.#pending.get(key);
-    const p = this.#ask(appId, perm).finally(() => this.#pending.delete(key));
+    const p = this.#ask(appId, perm, uid).finally(() => this.#pending.delete(key));
     this.#pending.set(key, p);
     return p;
   }
 
   /** Like request() but throws PermissionError when denied. */
-  async require(appId, perm) {
-    if (!(await this.request(appId, perm))) throw new PermissionError(appId, perm);
+  async require(appId, perm, uid) {
+    if (!(await this.request(appId, perm, uid))) throw new PermissionError(appId, perm);
   }
 
   /** Throws synchronously if not already granted. */
-  assert(appId, perm) {
-    if (!this.check(appId, perm)) throw new PermissionError(appId, perm);
+  assert(appId, perm, uid) {
+    if (!this.check(appId, perm, uid)) throw new PermissionError(appId, perm);
   }
 
-  grant(appId, perm) { this.#store(appId, perm, 'granted'); }
-  deny(appId, perm) { this.#store(appId, perm, 'denied'); }
+  grant(appId, perm, uid = this.#settings.currentUser) { this.#store(appId, perm, 'granted', uid); }
+  deny(appId, perm, uid = this.#settings.currentUser) { this.#store(appId, perm, 'denied', uid); }
 
   /** Forgets the decision so the user is asked again next time. */
-  reset(appId, perm) {
-    const grants = this.#settings.get('privacy.grants');
-    if (!grants[appId]) return;
-    if (perm) delete grants[appId][perm]; else delete grants[appId];
-    if (grants[appId] && !Object.keys(grants[appId]).length) delete grants[appId];
-    this.#settings.set('privacy.grants', grants);
-    for (const k of [...this.#onceGrants]) if (k.startsWith(`${appId}|`) && (!perm || k.endsWith(`|${perm}`))) this.#onceGrants.delete(k);
-    this.#bus?.emit('permissions:changed', { appId, permission: perm || null, state: 'prompt' });
+  reset(appId, perm, uid = this.#settings.currentUser) {
+    for (const k of [...this.#onceGrants]) {
+      if (k.startsWith(`${uid}|${appId}|`) && (!perm || k.endsWith(`|${perm}`))) this.#onceGrants.delete(k);
+    }
+    const grants = this.#settings.get('privacy.grants', uid);
+    if (grants[appId]) {
+      if (perm) delete grants[appId][perm]; else delete grants[appId];
+      if (grants[appId] && !Object.keys(grants[appId]).length) delete grants[appId];
+      this.#settings.set('privacy.grants', grants, uid);
+    }
+    this.#bus?.emit('permissions:changed', { appId, permission: perm || null, state: 'prompt', uid });
   }
 
-  /** Session-only grants ("Allow once") end when the user signs out. */
-  clearSessionGrants() { this.#onceGrants.clear(); }
+  /** "Allow once" grants end when that user signs out. */
+  clearSessionGrants(uid) {
+    for (const k of [...this.#onceGrants]) if (!uid || k.startsWith(`${uid}|`)) this.#onceGrants.delete(k);
+  }
 
   /** [{ permission, label, description, state }] for Settings › Privacy. */
-  listForApp(appId) {
+  listForApp(appId, uid) {
     const app = this.#registry.get(appId);
     return (app?.permissions || []).filter((p) => PERMISSIONS[p]).map((p) => ({
-      permission: p, ...PERMISSIONS[p], state: this.status(appId, p),
+      permission: p, ...PERMISSIONS[p], state: this.status(appId, p, uid),
     }));
   }
 
   /** Apps that declared a permission, with their state — "Which apps can use my camera?". */
-  appsUsing(perm) {
+  appsUsing(perm, uid) {
     return this.#registry.list({ includeHidden: true })
       .filter((a) => (a.permissions || []).includes(perm))
-      .map((a) => ({ appId: a.id, name: a.name, system: !!a.system, state: this.status(a.id, perm) }));
+      .map((a) => ({ appId: a.id, name: a.name, system: !!a.system, state: this.status(a.id, perm, uid) }));
   }
 
-  async #ask(appId, perm) {
+  async #ask(appId, perm, uid) {
     const app = this.#registry.get(appId);
     const answer = this.#prompter
-      ? await this.#prompter({ appId, appName: app.name, appIcon: app.icon, permission: perm, info: PERMISSIONS[perm] })
+      ? await this.#prompter({ appId, appName: app.name, appIcon: app.icon, permission: perm, info: PERMISSIONS[perm], uid })
       : 'denied'; // no UI available to ask: fail closed
+    if (answer === 'dismiss') return false; // closed without choosing: ask again next time
     if (answer === 'once') {
-      this.#onceGrants.add(`${appId}|${perm}`);
-      this.#bus?.emit('permissions:changed', { appId, permission: perm, state: 'granted', once: true });
+      this.#onceGrants.add(`${uid}|${appId}|${perm}`);
+      this.#bus?.emit('permissions:changed', { appId, permission: perm, state: 'granted', once: true, uid });
       return true;
     }
-    this.#store(appId, perm, answer === 'granted' ? 'granted' : 'denied');
+    this.#store(appId, perm, answer === 'granted' ? 'granted' : 'denied', uid);
     return answer === 'granted';
   }
 
-  #store(appId, perm, state) {
+  #store(appId, perm, state, uid) {
     if (!PERMISSIONS[perm]) throw new PermissionError(appId, perm);
-    const grants = this.#settings.get('privacy.grants');
+    const grants = this.#settings.get('privacy.grants', uid);
     grants[appId] = { ...(grants[appId] || {}), [perm]: state };
-    this.#settings.set('privacy.grants', grants);
-    this.#bus?.emit('permissions:changed', { appId, permission: perm, state });
+    this.#settings.set('privacy.grants', grants, uid);
+    this.#bus?.emit('permissions:changed', { appId, permission: perm, state, uid });
   }
 }

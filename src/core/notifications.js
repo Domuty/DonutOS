@@ -2,7 +2,7 @@
 // layer and Notification Center (phase 3) subscribe to the bus events emitted here.
 // History is stored per user so the Notification Center survives a restart.
 
-import { uid } from './util.js';
+import { uid as makeId } from './util.js';
 
 const MAX_HISTORY = 100;
 
@@ -19,20 +19,21 @@ export class NotificationService {
    * because notifications are off for the user or the app.
    * Do Not Disturb / Focus still stores it in the Center but marks it silent (no toast).
    */
-  post({ appId, appName, icon, title, body = '', actions = [], data = null, urgent = false }) {
-    if (!this.#settings.currentUser) return null;
-    if (!this.#settings.get('notifications.enabled')) return null;
-    const perApp = this.#settings.get('notifications.perApp');
+  post({ appId, appName, icon, title, body = '', actions = [], data = null, urgent = false, uid = this.#settings.currentUser }) {
+    if (!uid || !this.#settings.isLoaded(uid)) return null;
+    const s = this.#settings.forUser(uid);
+    if (!s.get('notifications.enabled')) return null;
+    const perApp = s.get('notifications.perApp');
     if (perApp[appId] === false) return null;
-    const quiet = this.#settings.get('notifications.dnd') || this.#settings.get('qs.focus');
+    const quiet = s.get('notifications.dnd') || s.get('qs.focus');
     const n = {
-      id: uid('n'), appId, appName, icon: icon || null,
+      id: makeId('n'), appId, appName, icon: icon || null,
       title: String(title || appName || 'Notification'), body: String(body),
       actions: actions.map((a) => ({ id: String(a.id), label: String(a.label) })),
-      data, time: Date.now(), read: false, silent: quiet && !urgent,
+      data, time: Date.now(), read: false, silent: quiet && !urgent, uid,
     };
-    const history = [n, ...this.#settings.get('notifications.history')].slice(0, MAX_HISTORY);
-    this.#settings.set('notifications.history', history);
+    const history = [n, ...s.get('notifications.history')].slice(0, MAX_HISTORY);
+    s.set('notifications.history', history);
     this.#bus.emit('notification:posted', n);
     return n;
   }

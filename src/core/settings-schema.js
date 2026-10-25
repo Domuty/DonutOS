@@ -76,6 +76,15 @@ export const SCHEMA = {
   'qs.focus':                 { scope: 'user', type: 'boolean', default: false },
   'qs.focusMinutes':          { scope: 'user', type: 'number', default: 30, min: 5, max: 240 },
 
+  // ── Sound ────────────────────────────────────────────────────────────
+  'sound.enabled':            { scope: 'user', type: 'boolean', default: true },
+  'sound.startup':            { scope: 'system', type: 'boolean', default: true },
+
+  // ── Lock screen ──────────────────────────────────────────────────────
+  'lock.showStatus':          { scope: 'user', type: 'boolean', default: true },
+  'lock.timeoutMin':          { scope: 'user', type: 'number', default: 0, min: 0, max: 240 },
+  'lock.signInWith':          { scope: 'user', type: 'string', default: 'pin', enum: ['pin', 'password'] },
+
   // ── Notifications ────────────────────────────────────────────────────
   'notifications.enabled':    { scope: 'user', type: 'boolean', default: true },
   'notifications.dnd':        { scope: 'user', type: 'boolean', default: false },

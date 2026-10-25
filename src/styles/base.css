@@ -1,16 +1,26 @@
-/* Design tokens shared by the whole system. Themes override these on :root. */
+/* Design tokens shared by the whole system. shell/theme.js sets data-theme and the accent. */
 :root {
   color-scheme: dark;
   --accent: #e8618c;
+  --accent-hover: #ee7fa3;
+  --accent-text: #f49ab8;
   --accent-contrast: #ffffff;
+  --accent-soft: rgba(232, 97, 140, 0.18);
   --bg: #14101a;
-  --surface: rgba(32, 27, 38, 0.82);
-  --surface-solid: #201b26;
+  --surface: rgba(36, 30, 42, 0.78);
+  --surface-solid: #221c28;
+  --surface-raised: #2b2431;
   --surface-2: rgba(255, 255, 255, 0.06);
+  --surface-3: rgba(255, 255, 255, 0.1);
+  --hover: rgba(255, 255, 255, 0.07);
+  --press: rgba(255, 255, 255, 0.04);
   --border: rgba(255, 255, 255, 0.09);
+  --border-strong: rgba(255, 255, 255, 0.16);
+  --input-bg: rgba(255, 255, 255, 0.06);
+  --input-border: rgba(255, 255, 255, 0.12);
   --text: #f4eff7;
-  --text-2: rgba(244, 239, 247, 0.68);
-  --text-3: rgba(244, 239, 247, 0.45);
+  --text-2: rgba(244, 239, 247, 0.7);
+  --text-3: rgba(244, 239, 247, 0.46);
   --ok: #6fdc8c;
   --warn: #ffcf5c;
   --danger: #ff6b6b;
@@ -18,9 +28,46 @@
   --radius: 8px;
   --radius-l: 12px;
   --shadow: 0 8px 32px rgba(0, 0, 0, 0.45);
-  --font: "Segoe UI Variable", "Segoe UI", system-ui, -apple-system, "Inter", "Roboto", "Helvetica Neue", Arial, sans-serif;
+  --shadow-s: 0 2px 8px rgba(0, 0, 0, 0.3);
+  --blur: blur(30px) saturate(150%);
+  --font: "Segoe UI Variable Text", "Segoe UI", system-ui, -apple-system, "Inter", "Roboto", "Helvetica Neue", Arial, sans-serif;
+  --font-display: "Segoe UI Variable Display", "Segoe UI", system-ui, -apple-system, "Inter", "Roboto", Arial, sans-serif;
   --font-mono: "Cascadia Mono", "JetBrains Mono", ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
   --ease-out: cubic-bezier(0.1, 0.9, 0.2, 1);
+  --ease-in: cubic-bezier(0.7, 0, 1, 0.5);
+  --dur: 1;
+  font-size: 14px;
+}
+
+:root[data-theme="light"] {
+  color-scheme: light;
+  --bg: #eef0f4;
+  --surface: rgba(246, 246, 249, 0.8);
+  --surface-solid: #f6f6f9;
+  --surface-raised: #ffffff;
+  --surface-2: rgba(0, 0, 0, 0.04);
+  --surface-3: rgba(0, 0, 0, 0.07);
+  --hover: rgba(0, 0, 0, 0.05);
+  --press: rgba(0, 0, 0, 0.03);
+  --border: rgba(0, 0, 0, 0.08);
+  --border-strong: rgba(0, 0, 0, 0.15);
+  --input-bg: rgba(255, 255, 255, 0.75);
+  --input-border: rgba(0, 0, 0, 0.13);
+  --text: #1c1a20;
+  --text-2: rgba(28, 26, 32, 0.7);
+  --text-3: rgba(28, 26, 32, 0.48);
+  --ok: #1f9a4a;
+  --warn: #b07800;
+  --danger: #c93636;
+  --shadow: 0 8px 32px rgba(0, 0, 0, 0.16);
+  --shadow-s: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+/* Without transparency effects, translucent surfaces become solid. */
+:root[data-transparency="off"] { --surface: var(--surface-solid); --blur: none; }
+:root[data-motion="reduce"] { --dur: 0; }
+:root[data-motion="reduce"] *, :root[data-motion="reduce"] *::before, :root[data-motion="reduce"] *::after {
+  animation-duration: 1ms !important; transition-duration: 1ms !important;
 }
 
 *, *::before, *::after { box-sizing: border-box; }
@@ -29,21 +76,23 @@ html, body {
   margin: 0;
   height: 100%;
   overflow: hidden;
-  background: var(--bg);
+  background: #000;
   color: var(--text);
   font-family: var(--font);
-  font-size: 14px;
+  font-size: 1rem;
   -webkit-font-smoothing: antialiased;
   user-select: none;
   -webkit-user-select: none;
   -webkit-tap-highlight-color: transparent;
 }
 
-#root { position: fixed; inset: 0; }
+#root { position: fixed; inset: 0; overflow: hidden; }
 
 button, input, select, textarea { font: inherit; color: inherit; }
 input, textarea, [contenteditable] { user-select: text; -webkit-user-select: text; }
-:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+:focus { outline: none; }
+:focus-visible { outline: 2px solid var(--text); outline-offset: 2px; border-radius: var(--radius-s); }
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: 1ms !important; transition-duration: 1ms !important; }

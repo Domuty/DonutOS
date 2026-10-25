@@ -174,6 +174,8 @@ function createWindow() {
 
   // DonutOS never navigates away from itself; external links open in the real browser.
   win.webContents.setWindowOpenHandler(({ url }) => {
+    // DonutOS's own pages (e.g. the core test runner) open in a normal window.
+    if (url.startsWith(ORIGIN + '/')) return { action: 'allow', overrideBrowserWindowOptions: { fullscreen: false, frame: true, width: 1100, height: 800, autoHideMenuBar: true } };
     if (/^https?:/i.test(url)) shell.openExternal(url);
     return { action: 'deny' };
   });

@@ -4,6 +4,9 @@
 // - Writes are validated against SCHEMA, applied immediately in memory, broadcast on the
 //   bus as "settings:changed", and persisted through the platform key-value store
 //   (IndexedDB on the web, JSON files on the desktop) after a short debounce.
+// - Several users can be signed in at once (fast user switching). One of them is the
+//   "active" user whose values get()/set() use by default; pass `uid` to address another,
+//   or use forUser(uid) for a view bound to one user.
 // - flush() forces pending writes to disk; the kernel calls it on shutdown and page hide.
 
 import { lookup } from './settings-schema.js';
@@ -13,13 +16,14 @@ import { log } from './log.js';
 
 const SYSTEM_KEY = 'settings:system';
 const userKey = (uid) => `settings:user:${uid}`;
+const own = (o, k) => Object.prototype.hasOwnProperty.call(o, k);
 
 export class SettingsStore {
   #kv; #bus;
   #system = {};
-  #user = null;      // values for the signed-in user, or null before sign-in
-  #uid = null;
-  #dirty = new Set(); // 'system' | uid
+  #users = new Map();   // uid -> values, for every signed-in user
+  #uid = null;          // the active user
+  #dirty = new Set();   // 'system' | uid
   #persistSoon;
 
   constructor({ kv, bus }) {
@@ -32,90 +36,115 @@ export class SettingsStore {
     this.#system = (await this.#kv.get(SYSTEM_KEY)) || {};
   }
 
+  /** Loads a user's settings (if not loaded yet) and makes them the active user. */
   async loadUser(uid) {
-    if (this.#uid && this.#uid !== uid) await this.unloadUser();
+    if (!this.#users.has(uid)) this.#users.set(uid, (await this.#kv.get(userKey(uid))) || {});
     this.#uid = uid;
-    this.#user = (await this.#kv.get(userKey(uid))) || {};
     this.#bus?.emit('settings:userLoaded', { uid });
   }
 
-  async unloadUser() {
+  /** Switches the active user to one that is already loaded. */
+  activateUser(uid) {
+    if (!this.#users.has(uid)) throw new SettingsError('user', `User ${uid} is not loaded`);
+    this.#uid = uid;
+    this.#bus?.emit('settings:userActivated', { uid });
+  }
+
+  async unloadUser(uid = this.#uid) {
+    if (!uid || !this.#users.has(uid)) return;
     await this.flush();
-    const uid = this.#uid;
-    this.#uid = null;
-    this.#user = null;
-    if (uid) this.#bus?.emit('settings:userUnloaded', { uid });
+    this.#users.delete(uid);
+    if (this.#uid === uid) this.#uid = null;
+    this.#bus?.emit('settings:userUnloaded', { uid });
   }
 
   get currentUser() { return this.#uid; }
+  loadedUsers() { return [...this.#users.keys()]; }
+  isLoaded(uid) { return this.#users.has(uid); }
 
-  /** Value of `key`, or its default. Unknown keys throw so typos are caught early. */
-  get(key) {
+  /** Value of `key` (for `uid`, default: the active user), or its default. Unknown keys throw. */
+  get(key, uid = this.#uid) {
     const def = this.#def(key);
-    const store = this.#storeFor(def, key, false);
-    const v = store && Object.prototype.hasOwnProperty.call(store, key) ? store[key] : def.default;
-    return deepClone(v);
+    const store = this.#storeFor(def, key, false, uid);
+    return deepClone(store && own(store, key) ? store[key] : def.default);
   }
 
-  has(key) {
+  has(key, uid = this.#uid) {
     const def = lookup(key);
     if (!def) return false;
-    const store = this.#storeFor(def, key, false);
-    return !!store && Object.prototype.hasOwnProperty.call(store, key);
+    const store = this.#storeFor(def, key, false, uid);
+    return !!store && own(store, key);
   }
 
-  set(key, value) {
+  set(key, value, uid = this.#uid) {
     const def = this.#def(key);
     this.#validate(key, def, value);
-    const store = this.#storeFor(def, key, true);
-    const old = this.get(key);
-    if (deepEqual(old, value) && Object.prototype.hasOwnProperty.call(store, key)) return value;
+    const store = this.#storeFor(def, key, true, uid);
+    const old = this.get(key, uid);
+    if (deepEqual(old, value) && own(store, key)) return value;
     store[key] = deepClone(value);
-    this.#markDirty(def);
-    this.#bus?.emit('settings:changed', { key, value: deepClone(value), old, scope: def.scope });
+    this.#markDirty(def, uid);
+    this.#bus?.emit('settings:changed', { key, value: deepClone(value), old, scope: def.scope, uid: def.scope === 'system' ? null : uid });
     return value;
   }
 
   /** Applies several values atomically (all validated before any is written). */
-  setMany(values) {
+  setMany(values, uid = this.#uid) {
     for (const [k, v] of Object.entries(values)) this.#validate(k, this.#def(k), v);
-    for (const [k, v] of Object.entries(values)) this.set(k, v);
+    for (const [k, v] of Object.entries(values)) this.set(k, v, uid);
   }
 
-  reset(key) {
+  reset(key, uid = this.#uid) {
     const def = this.#def(key);
-    const store = this.#storeFor(def, key, true);
-    if (!Object.prototype.hasOwnProperty.call(store, key)) return;
+    const store = this.#storeFor(def, key, true, uid);
+    if (!own(store, key)) return;
     const old = store[key];
     delete store[key];
-    this.#markDirty(def);
-    this.#bus?.emit('settings:changed', { key, value: deepClone(def.default), old, scope: def.scope });
+    this.#markDirty(def, uid);
+    this.#bus?.emit('settings:changed', { key, value: deepClone(def.default), old, scope: def.scope, uid: def.scope === 'system' ? null : uid });
   }
 
-  /** Every stored (non-default) key starting with `prefix` in the relevant scopes. */
-  keys(prefix = '') {
+  /** Every stored (non-default) key starting with `prefix`, system keys plus the user's. */
+  keys(prefix = '', uid = this.#uid) {
     const out = new Set();
     for (const k of Object.keys(this.#system)) if (k.startsWith(prefix)) out.add(k);
-    if (this.#user) for (const k of Object.keys(this.#user)) if (k.startsWith(prefix)) out.add(k);
+    const u = this.#users.get(uid);
+    if (u) for (const k of Object.keys(u)) if (k.startsWith(prefix)) out.add(k);
     return [...out];
   }
 
   /** Removes every stored key with the prefix (used when an app is uninstalled). */
-  resetPrefix(prefix) {
-    for (const k of this.keys(prefix)) this.reset(k);
+  resetPrefix(prefix, uid = this.#uid) {
+    for (const k of this.keys(prefix, uid)) this.reset(k, uid);
   }
 
   /**
    * Calls `fn(value, key, old)` whenever a key changes. `pattern` is an exact key or a
-   * prefix ending in "*" ("appearance.*"). Returns an unsubscribe function.
+   * prefix ending in "*" ("appearance.*"). User-scope changes are reported for `uid`
+   * only (default: whoever is active when the change happens). Returns an unsubscribe.
    */
-  watch(pattern, fn, { owner, immediate = false } = {}) {
+  watch(pattern, fn, { owner, immediate = false, uid } = {}) {
     const prefix = pattern.endsWith('*') ? pattern.slice(0, -1) : null;
-    const off = this.#bus.on('settings:changed', ({ key, value, old }) => {
-      if (prefix !== null ? key.startsWith(prefix) : key === pattern) fn(value, key, old);
+    const off = this.#bus.on('settings:changed', (e) => {
+      if (e.uid !== null && e.uid !== (uid ?? this.#uid)) return;
+      if (prefix !== null ? e.key.startsWith(prefix) : e.key === pattern) fn(e.value, e.key, e.old);
     }, { owner });
-    if (immediate && prefix === null) fn(this.get(pattern), pattern, undefined);
+    if (immediate && prefix === null) fn(this.get(pattern, uid ?? this.#uid), pattern, undefined);
     return off;
+  }
+
+  /** A settings API bound to one user — what a user's apps and shell use. */
+  forUser(uid) {
+    return Object.freeze({
+      uid,
+      get: (k) => this.get(k, uid),
+      has: (k) => this.has(k, uid),
+      set: (k, v) => this.set(k, v, uid),
+      setMany: (vals) => this.setMany(vals, uid),
+      reset: (k) => this.reset(k, uid),
+      keys: (p) => this.keys(p, uid),
+      watch: (p, fn, o = {}) => this.watch(p, fn, { ...o, uid }),
+    });
   }
 
   async flush() {
@@ -123,7 +152,7 @@ export class SettingsStore {
     const jobs = [];
     for (const target of this.#dirty) {
       if (target === 'system') jobs.push(this.#kv.set(SYSTEM_KEY, this.#system));
-      else if (target === this.#uid && this.#user) jobs.push(this.#kv.set(userKey(target), this.#user));
+      else if (this.#users.has(target)) jobs.push(this.#kv.set(userKey(target), this.#users.get(target)));
     }
     this.#dirty.clear();
     try {
@@ -134,16 +163,24 @@ export class SettingsStore {
     }
   }
 
-  /** Reads another user's stored settings without loading them (e.g. their lock-screen wallpaper). */
+  /** Reads a user's stored setting without signing them in (e.g. their lock-screen wallpaper). */
   async peekUser(uid, key) {
     const def = this.#def(key);
-    if (uid === this.#uid) return this.get(key);
+    if (this.#users.has(uid)) return this.get(key, uid);
     const data = (await this.#kv.get(userKey(uid))) || {};
-    return Object.prototype.hasOwnProperty.call(data, key) ? data[key] : deepClone(def.default);
+    return deepClone(own(data, key) ? data[key] : def.default);
+  }
+
+  /** Writes a setting for a user who is not signed in (used when creating an account). */
+  async pokeUser(uid, values) {
+    for (const [k, v] of Object.entries(values)) this.#validate(k, this.#def(k), v);
+    if (this.#users.has(uid)) { this.setMany(values, uid); return; }
+    const data = (await this.#kv.get(userKey(uid))) || {};
+    await this.#kv.set(userKey(uid), { ...data, ...deepClone(values) });
   }
 
   async deleteUser(uid) {
-    if (uid === this.#uid) throw new SettingsError('user', 'Cannot delete the signed-in user\'s settings');
+    if (this.#users.has(uid)) throw new SettingsError('user', 'Cannot delete the settings of a signed-in user');
     await this.#kv.delete(userKey(uid));
   }
 
@@ -154,17 +191,18 @@ export class SettingsStore {
     return def;
   }
 
-  #storeFor(def, key, forWrite) {
+  #storeFor(def, key, forWrite, uid) {
     if (def.scope === 'system') return this.#system;
-    if (!this.#user) {
+    const store = uid ? this.#users.get(uid) : null;
+    if (!store) {
       if (forWrite) throw new SettingsError(key, 'No user is signed in');
       return null;
     }
-    return this.#user;
+    return store;
   }
 
-  #markDirty(def) {
-    this.#dirty.add(def.scope === 'system' ? 'system' : this.#uid);
+  #markDirty(def, uid) {
+    this.#dirty.add(def.scope === 'system' ? 'system' : uid);
     this.#persistSoon();
   }
 

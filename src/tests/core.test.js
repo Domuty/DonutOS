@@ -549,6 +549,133 @@ test('kernel.open uses file associations', async () => {
   void m;
 });
 
+// ── Accounts & sessions ───────────────────────────────────────────────
+
+import { AccountService } from '../core/accounts.js';
+import { hashSecret, verifySecret } from '../core/crypto.js';
+
+const accountsFor = async () => {
+  const bus = new EventBus();
+  const settings = new SettingsStore({ kv: prefixedKv, bus });
+  await settings.loadSystem();
+  const svc = new AccountService({ kv: prefixedKv, fs: kernel.fs, settings, bus });
+  await svc.load();
+  return { svc, settings };
+};
+
+test('password hashing: salted, verifiable, never stores the secret', async () => {
+  const a = await hashSecret('correct horse', { iterations: 1000 });
+  const b = await hashSecret('correct horse', { iterations: 1000 });
+  assert.ok(a.salt !== b.salt && a.hash !== b.hash, 'random salt');
+  assert.ok(!JSON.stringify(a).includes('correct'));
+  assert.equal(await verifySecret('correct horse', a), true);
+  assert.equal(await verifySecret('Correct horse', a), false);
+});
+
+test('accounts: create, validate, verify password and PIN', async () => {
+  const { svc } = await accountsFor();
+  const first = await svc.create({ name: `Ada${RUN}`, password: 'p@ss', pin: '2468', hint: 'usual' });
+  assert.equal(first.type, 'admin', 'first account is an administrator');
+  assert.ok(first.hasPassword && first.hasPin);
+  assert.equal(first.home, `/Users/Ada${RUN}`);
+  assert.ok(!('password' in first), 'hashes are never exposed');
+  const second = await svc.create({ name: `Bo${RUN}` });
+  assert.equal(second.type, 'standard');
+  await assert.rejects(svc.create({ name: `ada${RUN}` }), 'EEXIST');
+  await assert.rejects(svc.create({ name: 'Guest' }), 'EINVAL');
+  await assert.rejects(svc.create({ name: 'a/b' }), 'EINVAL');
+  await assert.rejects(svc.create({ name: `Cy${RUN}`, pin: '12' }), 'EINVAL');
+  await assert.rejects(svc.create({ name: `Cy${RUN}`, password: 'donut', hint: 'my donut thing' }), 'EHINT');
+  assert.equal((await svc.verify(first.id, { password: 'p@ss' })).ok, true);
+  assert.equal((await svc.verify(first.id, { password: 'nope' })).ok, false);
+  assert.equal((await svc.verify(first.id, { pin: '2468' })).ok, true);
+  assert.equal((await svc.verify(second.id, { password: '' })).ok, true, 'no password: empty sign-in works');
+  assert.equal((await svc.verify(second.id, { pin: '0000' })).ok, false, 'no PIN set');
+  const again = new AccountService({ kv: prefixedKv, fs: kernel.fs, settings: (await accountsFor()).settings, bus: new EventBus() });
+  await again.load();
+  assert.equal(again.count, 2, 'accounts persist');
+});
+
+test('accounts: five wrong attempts lock the account', async () => {
+  const { svc } = await accountsFor();
+  const id = svc.list({ includeGuest: false }).find((a) => a.name === `Ada${RUN}`).id;
+  let r;
+  for (let i = 0; i < 5; i++) r = await svc.verify(id, { password: 'wrong' });
+  assert.ok(r.lockedFor > 25_000, 'locked for ~30 s');
+  assert.equal((await svc.verify(id, { password: 'p@ss' })).ok, false, 'even the right password waits');
+  const { svc: reloaded } = await accountsFor();
+  assert.ok(reloaded.lockedFor(id) > 0, 'lockout survives a restart');
+});
+
+test('accounts: change password, PIN, name, type; last admin protected', async () => {
+  const { svc } = await accountsFor();
+  const ada = svc.list().find((a) => a.name === `Ada${RUN}`);
+  const bo = svc.list().find((a) => a.name === `Bo${RUN}`);
+  await assert.rejects(svc.setPassword(ada.id, { current: 'bad', next: 'x' }), 'EAUTH');
+  await svc.setPassword(bo.id, { next: 'newpw', hint: 'h' });
+  assert.ok(svc.get(bo.id).hasPassword);
+  await svc.setPassword(bo.id, { next: 'reset-by-admin', asAdmin: true });
+  assert.equal((await svc.verify(bo.id, { password: 'reset-by-admin' })).ok, true);
+  await svc.setPin(bo.id, '13579');
+  assert.equal((await svc.verify(bo.id, { pin: '13579' })).ok, true);
+  await svc.setPin(bo.id, '');
+  assert.ok(!svc.get(bo.id).hasPin);
+  await svc.rename(bo.id, `Bob${RUN}`);
+  assert.equal(svc.get(bo.id).name, `Bob${RUN}`);
+  await assert.rejects(svc.setType(ada.id, 'standard'), 'ELASTADMIN');
+  await assert.rejects(svc.remove(ada.id), 'ELASTADMIN');
+  await svc.setType(bo.id, 'admin');
+  await svc.setType(ada.id, 'standard');
+  await svc.setAvatar(bo.id, { type: 'initials', color: '#123456' });
+  await assert.rejects(svc.setAvatar(bo.id, { type: 'image', data: 'javascript:alert(1)' }), 'EINVAL');
+  await kernel.fs.writeText(`${ada.home}/Documents/a.txt`, 'x', { mkdirp: true });
+  await svc.remove(ada.id);
+  assert.equal(svc.get(ada.id), null);
+  assert.ok(!(await kernel.fs.exists(ada.home)), 'files removed with the account');
+  await svc.remove(bo.id).catch((e) => assert.equal(e.code, 'ELASTADMIN'));
+  await prefixedKv.delete('accounts'); await prefixedKv.delete('accounts:lockout');
+});
+
+test('sessions: two users signed in at once keep separate settings, files and apps', async () => {
+  const other = { id: `test2-${RUN}`, name: 'Other', home: `${T}/home2`, isGuest: false };
+  await kernel.signIn(USER);
+  kernel.settings.set('appearance.theme', 'light');
+  let ctxA;
+  const m = kernel.registry.register(app('per-user', { permissions: ['files.read', 'files.write'], module: { default(ctx) { ctxA = ctx; } } }), { builtin: true });
+  const pa = await kernel.launch(m.id);
+  await kernel.signIn(other);
+  assert.equal(kernel.session.user.id, other.id);
+  assert.equal(kernel.settings.get('appearance.theme'), 'dark', 'second user has their own settings');
+  assert.equal(kernel.processes.get(pa.pid).state, 'running', 'first user\'s app keeps running');
+  // The first user's app still writes to the first user's home and storage.
+  await ctxA.fs.writeText('Documents/bg.txt', 'background');
+  assert.ok(await kernel.fs.exists(`${USER.home}/Documents/bg.txt`));
+  assert.ok(!(await kernel.fs.exists(`${other.home}/Documents/bg.txt`)));
+  ctxA.storage.set('k', 1);
+  assert.equal(kernel.settings.get(`app.${m.id}.k`, USER.id), 1);
+  assert.equal(kernel.settings.get(`app.${m.id}.k`), null, 'not visible to the active user');
+  await kernel.signIn(USER);
+  assert.equal(kernel.settings.get('appearance.theme'), 'light', 'switching back restores settings');
+  await kernel.signOut(other.id);
+  assert.ok(!kernel.sessions.has(other.id));
+  assert.equal(kernel.session.user.id, USER.id, 'signing out a background user keeps the active one');
+  await kernel.processes.kill(pa.pid);
+  await platform.kv.delete(`settings:user:${other.id}`);
+});
+
+test('sessions: the guest starts clean every time', async () => {
+  const guest = kernel.accounts.guest();
+  await kernel.signIn(guest);
+  await kernel.fs.writeText(`${guest.home}/Documents/left-behind.txt`, 'x');
+  kernel.settings.set('appearance.theme', 'light');
+  await kernel.signOut(guest.id);
+  assert.ok(!(await kernel.fs.exists(`${guest.home}/Documents/left-behind.txt`)));
+  await kernel.signIn(guest);
+  assert.equal(kernel.settings.get('appearance.theme'), 'dark');
+  await kernel.signOut(guest.id);
+  await kernel.signIn(USER);
+});
+
 test('signing out ends the user\'s apps', async () => {
   const m = kernel.registry.register(app('lingering', { module: { default() {} } }));
   await kernel.launch(m.id);

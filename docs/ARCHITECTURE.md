@@ -48,7 +48,7 @@ Everything above it talks to the adapter interface (`src/platform/adapter.js`), 
 
 ## Folder tree
 
-Files marked ✅ exist now (phase 1). The rest are created in the phase shown.
+Files marked ✅ exist now (phases 1–2). The rest are created in the phase shown.
 
 ```
 donutos/
@@ -65,6 +65,7 @@ donutos/
 │   ├── serve.js                 ✅ local static server for the web version
 │   ├── build-precache.js        ✅ writes src/precache-manifest.js (offline file list + version)
 │   ├── build-icons.js           ✅ renders the logo to PNG icons
+│   ├── build-wallpapers.js      ✅ renders the original wallpapers to JPEG
 │   └── vendor.js                ✅ copies JSZip into src/vendor
 ├── .github/workflows/
 │   └── release.yml              9  builds Windows/macOS/Linux installers and publishes a Release
@@ -80,23 +81,23 @@ donutos/
 │   └── fs-sandbox.test.js       ✅ sandbox escape + parity tests (node --test)
 └── src/
     ├── index.html               ✅
-    ├── boot.js                  ✅ entry point (phase 2: boot animation → lock → sign-in)
-    ├── kernel-console.js        ✅ live core read-out (kept as a developer tool)
+    ├── boot.js                  ✅ entry point: platform → kernel → shell
+    ├── kernel-console.js        ✅ live core read-out (developer tool, opened from Start)
     ├── manifest.webmanifest     ✅ PWA install
     ├── sw.js                    ✅ service worker
     ├── precache-manifest.js     ✅ generated
     ├── vendor/jszip.min.js      ✅
     ├── assets/
     │   ├── brand/               ✅ logo.svg + PNG icons
-    │   ├── wallpapers/          2  original generated wallpapers
+    │   ├── wallpapers/          ✅ 6 original wallpapers + thumbnails
     │   ├── icons/               3  app, file-type and system icons (SVG)
-    │   └── sounds/              3  notification/startup sounds (generated with WebAudio, no files)
+
     ├── styles/
     │   ├── base.css             ✅ design tokens
     │   ├── kernel-console.css   ✅
-    │   ├── shell.css            2–3
-    │   ├── window.css           4
-    │   └── controls.css         3  shared buttons, inputs, menus, toggles, sliders
+    │   ├── shell.css            ✅ boot, lock, sign-in, setup, power, session frame
+    │   ├── controls.css         ✅ buttons, inputs, toggles, menus, dialogs, spinner
+    │   └── window.css           4
     ├── platform/
     │   ├── adapter.js           ✅ THE interface + assertAdapter()
     │   ├── index.js             ✅ picks the adapter (the only platform check in /src)
@@ -116,21 +117,28 @@ donutos/
     │   ├── notifications.js     ✅
     │   ├── vfs.js               ✅ file API, recycle bin, search, per-app access control
     │   ├── path.js, mime.js, errors.js, log.js, util.js ✅
-    │   ├── users.js             2  accounts, hashed passwords/PINs (PBKDF2 via WebCrypto), guest
+    │   ├── accounts.js          ✅ accounts, guest, lockout, admin rules
+    │   ├── crypto.js            ✅ PBKDF2-SHA-256 password/PIN hashing (WebCrypto)
     │   ├── clipboard.js         3  clipboard history
     │   └── shortcuts.js         3  global keyboard shortcut registry
-    ├── shell/                   2–3
-    │   ├── boot-screen.js, lock-screen.js, sign-in.js            2
+    ├── shell/
+    │   ├── shell.js             ✅ screen state machine, sessions, shortcuts, auto-lock
+    │   ├── boot-screen.js, lock-screen.js, sign-in.js, oobe.js  ✅
+    │   ├── power.js             ✅ sleep, shut down, restart, sign out (with screens)
+    │   ├── session-view.js      ✅ per-user screen (replaced by desktop/taskbar in 3)
+    │   ├── accounts-panel.js, personalize-panel.js  ✅ (embedded in Settings in 5)
+    │   ├── permission-prompt.js ✅
+    │   ├── theme.js, wallpaper.js, sounds.js, format.js, status-icons.js, prefs.js  ✅
     │   ├── desktop.js, taskbar.js, start-menu.js, search.js      3
     │   ├── quick-settings.js, notification-center.js, toasts.js  3
     │   ├── widgets.js, calendar-flyout.js, run-dialog.js         3
     │   ├── emoji-panel.js, clipboard-panel.js, snipping.js       3
-    │   ├── context-menu.js, dialogs.js, permission-prompt.js     3
+    │   ├── context-menu.js                                       3
     │   └── display-filters.js   3  brightness, night light, high contrast, magnifier
     ├── wm/                      4
     │   ├── window-manager.js, window.js, snap.js, snap-layouts.js
     │   ├── virtual-desktops.js, task-view.js, alt-tab.js
-    ├── ui/                      3  tiny component helpers shared by shell and apps (h(), menus, lists)
+    ├── ui/                      ✅ h.js (DOM helper), icons.js, avatar.js, dialog.js, menu.js
     ├── apps/
     │   ├── index.js             ✅ built-in manifest list (filled as apps arrive)
     │   ├── explorer/ terminal/ settings/ taskmanager/                         5
@@ -220,6 +228,24 @@ against the user's home and require `files.read`/`files.write` inside the home a
 **Notifications** (`core/notifications.js`) — per-user history, Do Not Disturb/Focus mark
 notifications silent (stored, no toast), per-app mute.
 
+## Accounts and sessions
+
+- **Accounts** (`core/accounts.js`) are stored in the key-value store. Passwords and PINs are
+  hashed with PBKDF2-SHA-256 (310,000 iterations, random salt) and compared in constant time; the
+  secret itself is never stored. Five wrong attempts lock an account for 30 s (survives restarts).
+  The first account is an administrator and the last administrator can't be demoted or removed.
+- **Guest** has no password and its home (`/Users/Guest`) and settings are wiped on sign-out
+  and again on sign-in.
+- **Sessions** (`kernel.signIn / signOut`): several users can be signed in at once. One is active
+  (on screen); the others keep running. Every process belongs to the user who started it, so a
+  background user's apps keep reading/writing *their* home, storage and permissions.
+  The settings store keeps every signed-in user's settings loaded (`settings.forUser(uid)`).
+- **Shell flow**: boot → first-run setup (no accounts) or lock screen → sign-in → session.
+  Lock (Ctrl+Alt+L, Win+L where the host OS allows, auto-lock after idle), switch user and
+  sign out return to the lock/sign-in screens; sleep, shut down and restart have their own screens.
+- **Forgotten password**: hint; another administrator can reset it; otherwise "Reset DonutOS"
+  erases everything (typed confirmation) and restarts into setup.
+
 ## The app context (`ctx`)
 
 | Member | What it does | Permission |
@@ -237,6 +263,7 @@ notifications silent (stored, no toast), per-app mute.
 | `launch(appId, args)`, `open(path)` | start apps / open files | — |
 | `processes.list/kill/self` | other processes | `system.processes` |
 | `system.info/stats/battery/network/on…Change/user/log` | device information | — |
+| `accounts.current/list` | who the app runs as, and the device's accounts (no secrets) | — |
 | `host.importFiles/exportFile/openExternal` | the real computer | `openExternal`: `network` |
 | `power.shutdown/restart` | power | `system.power` |
 | `windows.*` (phase 4), `ui.*` (phase 3) | windows, dialogs, menus | — |

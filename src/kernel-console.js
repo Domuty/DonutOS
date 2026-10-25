@@ -1,6 +1,6 @@
 // Kernel console: a live read-out of the running core (platform, hardware stats, processes,
-// file system, update channel and kernel log). Shown after boot until the shell lands in
-// phase 2, and kept afterwards as a developer tool.
+// file system, update channel and kernel log). A developer tool; mountKernelConsole()
+// renders into a container and returns a function that stops it.
 
 import { formatBytes } from './core/util.js';
 
@@ -16,14 +16,12 @@ export function mountKernelConsole(root, kernel) {
         <img src="assets/brand/logo.svg" alt="">
         <div>
           <h1>DonutOS ${esc(kernel.version)} — kernel console</h1>
-          <p>The core is running on the <b>${esc(platform.name)}</b> platform. The desktop shell arrives in phase 2.</p>
+          <p>The core is running on the <b>${esc(platform.name)}</b> platform.</p>
         </div>
         <div class="kc-actions">
-          <a class="kc-btn kc-primary" href="tests/index.html">Run core tests</a>
+          <a class="kc-btn kc-primary" href="tests/index.html" target="_blank" rel="noopener">Run core tests</a>
           <button data-act="fullscreen">Toggle full screen</button>
           <button data-act="update">Check for updates</button>
-          <button data-act="restart">Restart</button>
-          <button data-act="shutdown">Shut down</button>
         </div>
       </header>
       <div class="kc-grid">
@@ -55,6 +53,7 @@ export function mountKernelConsole(root, kernel) {
 
   const refreshStats = async () => {
     const s = await platform.system.stats();
+    if (!root.querySelector('.kc')) return; // closed while waiting
     $('est').textContent = s.estimated ? '(estimated)' : '(from the OS)';
     $('cpu').textContent = `${s.cpu.usage.toFixed(1)} %`;
     meter('cpu', s.cpu.usage);
@@ -67,8 +66,10 @@ export function mountKernelConsole(root, kernel) {
     const up = Math.floor(s.uptime);
     $('uptime').textContent = `${Math.floor(up / 3600)}h ${Math.floor((up % 3600) / 60)}m ${up % 60}s`;
     const b = await platform.system.battery();
+    if (!root.querySelector('.kc')) return;
     $('battery').textContent = b.supported ? `${Math.round(b.level * 100)} % ${b.charging ? '(charging)' : ''}` : 'No battery reported';
     const n = await platform.system.network();
+    if (!root.querySelector('.kc')) return;
     $('net').textContent = n.online ? `Online · ${n.type}${n.effectiveType ? ` · ${n.effectiveType}` : ''}${n.interfaces.length ? ` · ${n.interfaces.map((i) => i.name).join(', ')}` : ''}` : 'Offline';
   };
 
@@ -84,6 +85,7 @@ export function mountKernelConsole(root, kernel) {
       lines.push(`${'  '.repeat(depth)}${e.type === 'dir' ? '▸ ' : '  '}${e.name}${e.type === 'file' ? `  (${formatBytes(e.size)})` : ''}`);
       return depth < 2;
     });
+    if (!root.querySelector('.kc')) return;
     $('tree').textContent = ['/', ...lines].join('\n');
   };
 
@@ -97,25 +99,23 @@ export function mountKernelConsole(root, kernel) {
       `${new Date(e.time).toLocaleTimeString()}  ${e.level.padEnd(5)} ${e.source}: ${e.message}`).join('\n');
   };
 
-  root.addEventListener('click', async (e) => {
+  const onClick = async (e) => {
     const act = e.target.closest('[data-act]')?.dataset.act;
     if (act === 'fullscreen') await platform.display.setFullscreen(!platform.display.isFullscreen());
     if (act === 'update') {
       if (platform.updates.status().state === 'ready') await platform.updates.install();
       else refreshUpdate(await platform.updates.check());
     }
-    if (act === 'restart') await kernel.restart();
-    if (act === 'shutdown' && !(await kernel.shutdown())) {
-      // The browser would not let the page close itself: show the power-off screen instead.
-      root.innerHTML = '<div class="kc-boot"><p class="kc-step">DonutOS has shut down. You can close this tab.</p><button class="kc-power">Start DonutOS</button></div>';
-      root.querySelector('.kc-power').addEventListener('click', () => location.reload());
-    }
-  });
+  };
+  root.addEventListener('click', onClick);
 
-  platform.updates.onStatus(refreshUpdate);
-  kernel.bus.on('kernel:log', refreshLog);
-  kernel.bus.on('process:sample', refreshProcs);
-  kernel.bus.on('fs:changed', refreshTree);
-  setInterval(refreshStats, 1000);
+  const offs = [
+    platform.updates.onStatus(refreshUpdate),
+    kernel.bus.on('kernel:log', refreshLog),
+    kernel.bus.on('process:sample', refreshProcs),
+    kernel.bus.on('fs:changed', refreshTree),
+  ];
+  const timer = setInterval(refreshStats, 1000);
   refreshStats(); refreshProcs(); refreshTree(); refreshUpdate(); refreshLog();
+  return () => { clearInterval(timer); offs.forEach((off) => off()); root.removeEventListener('click', onClick); root.replaceChildren(); };
 }

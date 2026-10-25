@@ -9,6 +9,7 @@ import { FileAssociations } from './file-associations.js';
 import { NotificationService } from './notifications.js';
 import { ProcessManager } from './process-manager.js';
 import { VirtualFileSystem, HOME_FOLDERS } from './vfs.js';
+import { AccountService, GUEST_ID } from './accounts.js';
 import { PermissionError, ProcessError } from './errors.js';
 import { log } from './log.js';
 import * as P from './path.js';
@@ -28,7 +29,9 @@ export class Kernel {
     this.notifications = new NotificationService({ settings: this.settings, bus: this.bus });
     this.processes = new ProcessManager({ registry: this.registry, bus: this.bus });
     this.fs = new VirtualFileSystem({ fs: platform.fs, bus: this.bus });
-    this.session = { user: null };   // { id, name, home, isGuest } once signed in (phase 2)
+    this.accounts = new AccountService({ kv: platform.kv, fs: this.fs, settings: this.settings, bus: this.bus });
+    this.session = { user: null };   // the active (foreground) user
+    this.sessions = new Map();       // uid -> { user, startedAt } for everyone signed in
     this.booted = false;
     this.bootTime = null;
     this.info = null;
@@ -42,6 +45,7 @@ export class Kernel {
       ['Starting platform', () => this.platform.init()],
       ['Reading device information', async () => { this.info = await this.platform.info(); }],
       ['Loading settings', () => this.settings.loadSystem()],
+      ['Loading accounts', () => this.accounts.load()],
       ['Preparing file system', () => this.#ensureLayout()],
       ['Loading apps', () => this.#loadApps()],
       ['Starting services', () => this.#startServices()],
@@ -89,23 +93,80 @@ export class Kernel {
     document.addEventListener('visibilitychange', () => { if (document.hidden) flush(); });
   }
 
-  // ── Session (accounts arrive in phase 2) ─────────────────────────────
+  // ── Sessions ─────────────────────────────────────────────────────────
+  // Several users can be signed in at once. One session is active (on screen); the others
+  // keep running in the background until their user switches back or signs out.
 
-  async setSessionUser(user) {
-    if (user) {
+  /** Starts a session for `user` (or resumes it if already signed in) and makes it active. */
+  async signIn(user) {
+    if (!this.sessions.has(user.id)) {
+      if (user.isGuest) await this.accounts.wipeGuest(); // never inherit a previous guest's data
       await this.settings.loadUser(user.id);
       await this.fs.mkdir(user.home, { recursive: true });
       for (const f of HOME_FOLDERS) await this.fs.mkdir(P.join(user.home, f), { recursive: true });
-    } else {
-      await this.processes.killAll();
-      this.permissions.clearSessionGrants();
-      await this.settings.unloadUser();
+      this.sessions.set(user.id, { user: Object.freeze({ ...user }), startedAt: Date.now() });
+      this.bus.emit('session:started', { user: this.sessions.get(user.id).user });
     }
-    this.session.user = user ? Object.freeze({ ...user }) : null;
-    this.bus.emit('session:changed', { user: this.session.user });
+    this.#activate(user.id);
+    if (!user.isGuest) this.settings.set('system.lastUser', user.id);
+    return this.session.user;
+  }
+
+  /** Ends a user's session: their apps are closed and their settings saved. */
+  async signOut(uid = this.session.user?.id) {
+    const s = this.sessions.get(uid);
+    if (!s) return;
+    this.bus.emit('session:ending', { user: s.user });
+    await this.processes.killAll({ user: uid });
+    this.permissions.clearSessionGrants(uid);
+    await this.settings.unloadUser(uid);
+    this.sessions.delete(uid);
+    if (uid === GUEST_ID) await this.accounts.wipeGuest();
+    if (this.session.user?.id === uid) {
+      this.session.user = null;
+      this.bus.emit('session:changed', { user: null });
+    }
+    this.bus.emit('session:ended', { user: s.user });
+  }
+
+  /** Brings an already signed-in session to the foreground. */
+  #activate(uid) {
+    const s = this.sessions.get(uid);
+    this.settings.activateUser(uid);
+    if (this.session.user?.id === uid) return;
+    this.session.user = s.user;
+    this.bus.emit('session:changed', { user: s.user });
+  }
+
+  /** Re-reads the active user's public record after an account change (name, picture). */
+  refreshSessionUser(uid) {
+    const s = this.sessions.get(uid);
+    const fresh = this.accounts.get(uid);
+    if (!s || !fresh) return;
+    s.user = Object.freeze({ ...fresh });
+    if (this.session.user?.id === uid) this.session.user = s.user;
+    this.bus.emit('session:userUpdated', { user: s.user });
+  }
+
+  /** Compatibility helper used by tests: sign in `user`, or sign the active user out. */
+  async setSessionUser(user) {
+    if (user) await this.signIn(user);
+    else await this.signOut();
   }
 
   home() { return this.session.user?.home || '/Users/Public'; }
+  homeFor(uid) { return this.sessions.get(uid)?.user.home || '/Users/Public'; }
+
+  /** Erases every account, file and setting and restarts into first-time setup. */
+  async factoryReset() {
+    this.bus.emit('kernel:powerOff', { reason: 'reset' });
+    await this.processes.killAll();
+    for (const uid of [...this.sessions.keys()]) await this.settings.unloadUser(uid);
+    this.sessions.clear();
+    for (const e of await this.fs.readdir('/', { hidden: true })) await this.fs.remove(e.path, { recursive: true });
+    for (const key of await this.platform.kv.keys('')) await this.platform.kv.delete(key);
+    return this.platform.power.restart();
+  }
 
   // ── Launching ────────────────────────────────────────────────────────
 
@@ -113,24 +174,29 @@ export class Kernel {
     return this.processes.spawn(appId, { args, user: this.session.user?.id || null, ...opts });
   }
 
+  /** Puts the active user's apps on hold while the screen is locked (shell decides UI). */
+  lock() { this.bus.emit('session:locked', { user: this.session.user }); }
+  unlock() { this.bus.emit('session:unlocked', { user: this.session.user }); }
+
   /**
    * Opens a file with its default app. Resolves with the process, or null when no app
    * can open it — the shell then shows the "Open with" dialog (kernel:openWith).
    */
-  async open(path, { appId } = {}) {
+  async open(path, { appId, user } = {}) {
     const s = await this.fs.stat(path);
     if (!s) throw new ProcessError('ENOENT', `${path} does not exist`);
-    if (s.type === 'dir') return this.launch('explorer', { path });
+    const opts = user ? { user } : {};
+    if (s.type === 'dir') return this.launch('explorer', { path }, opts);
     const target = appId || this.associations.appForPath(path);
     if (!target) { this.bus.emit('kernel:openWith', { path }); return null; }
-    this.#rememberRecent(path);
-    return this.launch(target, { path });
+    this.#rememberRecent(path, user);
+    return this.launch(target, { path }, opts);
   }
 
-  #rememberRecent(path) {
-    if (!this.session.user) return;
-    const list = this.settings.get('start.recentFiles').filter((r) => r.path !== path);
-    this.settings.set('start.recentFiles', [{ path, time: Date.now() }, ...list].slice(0, 30));
+  #rememberRecent(path, uid = this.session.user?.id) {
+    if (!uid || !this.settings.isLoaded(uid)) return;
+    const list = this.settings.get('start.recentFiles', uid).filter((r) => r.path !== path);
+    this.settings.set('start.recentFiles', [{ path, time: Date.now() }, ...list].slice(0, 30), uid);
   }
 
   // ── Power ────────────────────────────────────────────────────────────
@@ -150,45 +216,53 @@ export class Kernel {
     const k = this;
     const pm = this.processes;
     const need = async (proc, perm) => {
-      if (!(await k.permissions.request(proc.appId, perm))) throw new PermissionError(proc.appId, perm);
+      if (!(await k.permissions.request(proc.appId, perm, proc.user))) throw new PermissionError(proc.appId, perm);
     };
+    // A process belongs to the user who started it, even when another user is on screen.
+    const permsFor = (proc) => ({ request: (appId, perm) => k.permissions.request(appId, perm, proc.user) });
 
-    pm.provide('fs', (proc) => k.fs.forApp(proc.appId, { permissions: k.permissions, getHome: () => k.home() }));
+    pm.provide('fs', (proc) => k.fs.forApp(proc.appId, { permissions: permsFor(proc), getHome: () => k.homeFor(proc.user) }));
 
     // Free-form, per-user storage private to the app.
     pm.provide('storage', (proc) => {
       const prefix = `app.${proc.appId}.`;
       const check = (key) => { if (typeof key !== 'string' || !/^[\w.-]{1,100}$/.test(key)) throw new TypeError('Storage keys must be 1-100 letters, digits, "_", "-" or "."'); return prefix + key; };
+      const loaded = () => proc.user && k.settings.isLoaded(proc.user);
       return Object.freeze({
-        get: (key, fallback = null) => { const v = k.settings.currentUser ? k.settings.get(check(key)) : null; return v === null || v === undefined ? fallback : v; },
-        set: (key, value) => k.settings.set(check(key), value),
-        remove: (key) => k.settings.reset(check(key)),
-        keys: () => k.settings.keys(prefix).map((x) => x.slice(prefix.length)),
-        watch: (key, fn) => k.settings.watch(check(key), proc.wrap(fn), { owner: proc.pid }),
+        get: (key, fallback = null) => { const v = loaded() ? k.settings.get(check(key), proc.user) : null; return v === null || v === undefined ? fallback : v; },
+        set: (key, value) => k.settings.set(check(key), value, proc.user),
+        remove: (key) => k.settings.reset(check(key), proc.user),
+        keys: () => k.settings.keys(prefix, proc.user).filter((x) => x.startsWith(prefix)).map((x) => x.slice(prefix.length)),
+        watch: (key, fn) => k.settings.watch(check(key), proc.wrap(fn), { owner: proc.pid, uid: proc.user }),
       });
     });
 
     pm.provide('settings', (proc) => Object.freeze({
-      get: (key) => k.settings.get(key),
-      watch: (pattern, fn) => k.settings.watch(pattern, proc.wrap(fn), { owner: proc.pid }),
-      set: async (key, value) => { await need(proc, 'system.settings'); return k.settings.set(key, value); },
-      reset: async (key) => { await need(proc, 'system.settings'); return k.settings.reset(key); },
+      get: (key) => k.settings.get(key, proc.user),
+      watch: (pattern, fn) => k.settings.watch(pattern, proc.wrap(fn), { owner: proc.pid, uid: proc.user }),
+      set: async (key, value) => { await need(proc, 'system.settings'); return k.settings.set(key, value, proc.user); },
+      reset: async (key) => { await need(proc, 'system.settings'); return k.settings.reset(key, proc.user); },
     }));
 
     pm.provide('permissions', (proc) => Object.freeze({
-      check: (perm) => k.permissions.check(proc.appId, perm),
-      request: (perm) => k.permissions.request(proc.appId, perm),
-      status: (perm) => k.permissions.status(proc.appId, perm),
-      list: () => k.permissions.listForApp(proc.appId),
+      check: (perm) => k.permissions.check(proc.appId, perm, proc.user),
+      request: (perm) => k.permissions.request(proc.appId, perm, proc.user),
+      status: (perm) => k.permissions.status(proc.appId, perm, proc.user),
+      list: () => k.permissions.listForApp(proc.appId, proc.user),
     }));
 
     pm.provide('notify', (proc) => async (opts) => {
       await need(proc, 'notifications');
-      return k.notifications.post({ ...opts, appId: proc.appId, appName: proc.name, icon: opts.icon || proc.icon });
+      return k.notifications.post({ ...opts, appId: proc.appId, appName: proc.name, icon: opts.icon || proc.icon, uid: proc.user });
     });
 
-    pm.provide('launch', () => (appId, args) => k.launch(appId, args));
-    pm.provide('open', () => (path, opts) => k.open(path, opts));
+    pm.provide('accounts', (proc) => Object.freeze({
+      current: () => k.sessions.get(proc.user)?.user || null,
+      list: () => k.accounts.list(),
+    }));
+
+    pm.provide('launch', (proc) => (appId, args) => k.launch(appId, args, { user: proc.user }));
+    pm.provide('open', (proc) => (path, opts = {}) => k.open(path, { ...opts, user: proc.user }));
 
     pm.provide('processes', (proc) => Object.freeze({
       list: async () => { await need(proc, 'system.processes'); return pm.snapshot(); },
@@ -208,7 +282,7 @@ export class Kernel {
       network: () => k.platform.system.network(),
       onBatteryChange: (fn) => ctx.own(k.platform.system.onBatteryChange(proc.wrap(fn))),
       onNetworkChange: (fn) => ctx.own(k.platform.system.onNetworkChange(proc.wrap(fn))),
-      user: () => k.session.user,
+      user: () => k.sessions.get(proc.user)?.user || null,
       log: (msg, data) => log.info(proc.appId, msg, data),
     }));
 
