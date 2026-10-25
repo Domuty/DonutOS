@@ -1,0 +1,46 @@
+/* Phase 1 kernel console: shown after the core boots, until the shell arrives in phase 2. */
+.kc-boot {
+  position: absolute; inset: 0; display: grid; place-items: center; align-content: center; gap: 28px;
+  background: #000;
+}
+.kc-logo { width: 112px; height: 112px; animation: kc-spin 2.4s var(--ease-out) infinite; }
+@keyframes kc-spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+.kc-bar { width: 220px; height: 3px; border-radius: 3px; background: rgba(255,255,255,.12); overflow: hidden; }
+.kc-bar > i { display: block; height: 100%; width: 0; background: var(--accent); transition: width .25s var(--ease-out); }
+.kc-step { color: var(--text-3); font-size: 12px; min-height: 1em; }
+.kc-error { color: var(--danger); max-width: 520px; text-align: center; line-height: 1.5; }
+
+.kc {
+  position: absolute; inset: 0; overflow: auto; padding: 28px clamp(16px, 4vw, 48px) 48px;
+  background: radial-gradient(1200px 600px at 10% -10%, #3a1d33 0%, transparent 60%), var(--bg);
+  user-select: text; -webkit-user-select: text;
+  animation: kc-fade .35s var(--ease-out);
+}
+@keyframes kc-fade { from { opacity: 0; transform: translateY(6px); } }
+.kc header { display: flex; align-items: center; gap: 14px; margin-bottom: 22px; }
+.kc header img { width: 44px; height: 44px; }
+.kc h1 { font-size: 22px; font-weight: 600; margin: 0; }
+.kc header p { margin: 2px 0 0; color: var(--text-2); }
+.kc header .kc-actions { margin-left: auto; display: flex; gap: 8px; flex-wrap: wrap; }
+.kc a.kc-btn, .kc button {
+  display: inline-flex; align-items: center; gap: 6px; padding: 7px 14px; border-radius: var(--radius-s);
+  border: 1px solid var(--border); background: var(--surface-2); color: var(--text); text-decoration: none; cursor: pointer;
+}
+.kc a.kc-btn:hover, .kc button:hover { background: rgba(255,255,255,.1); }
+.kc .kc-primary { background: var(--accent); border-color: transparent; color: var(--accent-contrast); }
+.kc .kc-primary:hover { filter: brightness(1.08); background: var(--accent); }
+.kc-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 14px; }
+.kc section { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-l); padding: 16px 18px; min-width: 0; }
+.kc h2 { font-size: 13px; font-weight: 600; margin: 0 0 12px; color: var(--text-2); text-transform: uppercase; letter-spacing: .06em; }
+.kc dl { display: grid; grid-template-columns: minmax(80px, 38%) minmax(0, 1fr); gap: 6px 16px; margin: 0; }
+.kc dt { color: var(--text-3); }
+.kc dd { margin: 0; overflow-wrap: anywhere; }
+.kc-meter { height: 6px; border-radius: 6px; background: rgba(255,255,255,.08); overflow: hidden; margin-top: 4px; }
+.kc-meter > i { display: block; height: 100%; background: var(--accent); transition: width .4s var(--ease-out); }
+.kc table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
+.kc th, .kc td { text-align: left; padding: 6px 4px; border-bottom: 1px solid var(--border); }
+.kc th { color: var(--text-3); font-weight: 500; }
+.kc pre { margin: 0; font-family: var(--font-mono); font-size: 12px; color: var(--text-2); white-space: pre-wrap; max-height: 260px; overflow: auto; }
+.kc .kc-note { color: var(--text-3); font-size: 12px; margin-top: 10px; line-height: 1.5; }
+.kc-power { padding: 8px 18px; border-radius: var(--radius-s); border: 1px solid var(--border); background: var(--surface-2); color: var(--text); cursor: pointer; }
+.kc-power:hover { background: rgba(255,255,255,.12); }

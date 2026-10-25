@@ -1,0 +1,72 @@
+{
+  "name": "donutos",
+  "productName": "DonutOS",
+  "version": "0.1.0",
+  "description": "DonutOS — a desktop operating system environment for the web and the desktop.",
+  "main": "electron/main.js",
+  "author": "DonutOS contributors",
+  "license": "MIT",
+  "private": true,
+  "scripts": {
+    "start": "electron .",
+    "start:windowed": "electron . --windowed",
+    "serve": "node scripts/serve.js",
+    "build:precache": "node scripts/build-precache.js",
+    "vendor": "node scripts/vendor.js",
+    "test": "npm run test:node && npm run test:desktop",
+    "test:node": "node --test tests/node/*.test.js",
+    "test:desktop": "electron . --tests",
+    "dist": "npm run build:precache && electron-builder",
+    "dist:win": "npm run build:precache && electron-builder --win",
+    "dist:mac": "npm run build:precache && electron-builder --mac",
+    "dist:linux": "npm run build:precache && electron-builder --linux"
+  },
+  "devDependencies": {
+    "electron": "45.0.0",
+    "electron-builder": "26.18.0"
+  },
+  "dependencies": {
+    "electron-updater": "6.8.11",
+    "jszip": "3.10.1"
+  },
+  "build": {
+    "appId": "app.donutos.desktop",
+    "productName": "DonutOS",
+    "directories": {
+      "output": "dist",
+      "buildResources": "build"
+    },
+    "files": [
+      "electron/**/*",
+      "src/**/*",
+      "package.json",
+      "!src/tests/**/*"
+    ],
+    "publish": [
+      {
+        "provider": "github"
+      }
+    ],
+    "win": {
+      "target": ["nsis"],
+      "icon": "build/icon.png"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "DonutOS"
+    },
+    "mac": {
+      "target": ["dmg", "zip"],
+      "icon": "build/icon.png",
+      "category": "public.app-category.productivity"
+    },
+    "linux": {
+      "target": ["AppImage", "deb"],
+      "icon": "build/icon.png",
+      "category": "Utility"
+    }
+  }
+}

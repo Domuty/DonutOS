@@ -1,0 +1,568 @@
+// Core test suite. Runs against whichever platform adapter is active (web or desktop),
+// so the same tests prove both builds behave identically. All data is written under a
+// throw-away folder and "test:" keys, and removed afterwards.
+
+import { test, assert, run } from './harness.js';
+import { createPlatform } from '../platform/index.js';
+import { assertAdapter } from '../platform/adapter.js';
+import { createKernel } from '../core/kernel.js';
+import { EventBus } from '../core/event-bus.js';
+import { SettingsStore } from '../core/settings.js';
+import { validateManifest } from '../core/registry.js';
+import * as P from '../core/path.js';
+import { sleep } from '../core/util.js';
+
+globalThis.DONUT_NO_SW = true;
+const platform = createPlatform({ dbName: 'donutos-tests' });
+const kernel = createKernel({ platform });
+const RUN = Math.random().toString(36).slice(2, 8);
+const T = `/__tests__${RUN}`;          // scratch folder
+const USER = { id: `test-${RUN}`, name: 'Test User', home: `${T}/home`, isGuest: false };
+const prefixedKv = {
+  get: (k) => platform.kv.get(`test:${RUN}:${k}`),
+  set: (k, v) => platform.kv.set(`test:${RUN}:${k}`, v),
+  delete: (k) => platform.kv.delete(`test:${RUN}:${k}`),
+  keys: async (p = '') => (await platform.kv.keys(`test:${RUN}:${p}`)).map((k) => k.slice(`test:${RUN}:`.length)),
+};
+const testApps = [];
+const app = (id, extra = {}) => {
+  const full = `test.${RUN}.${id}`;
+  testApps.push(full);
+  return { id: full, name: `Test ${id}`, version: '1.0.0', ...extra };
+};
+
+// ── Platform adapter ───────────────────────────────────────────────────
+
+test('adapter implements the full interface', () => { assertAdapter(platform); });
+
+test('kernel boots', async () => {
+  await kernel.boot();
+  assert.ok(kernel.booted);
+  assert.ok(await kernel.fs.isDir('/Users/Public/Documents'), 'standard folders exist');
+  const v = await kernel.fs.readJSON('/System/version.json');
+  assert.equal(v.version, kernel.version);
+  await kernel.fs.mkdir(T);
+});
+
+test('adapter info has the documented shape', async () => {
+  const i = await platform.info();
+  assert.equal(i.platform, platform.name);
+  for (const k of ['os', 'arch', 'hostname', 'cpuModel', 'engine', 'appVersion']) assert.equal(typeof i[k], 'string', k);
+  assert.ok(i.cores >= 1);
+});
+
+test('system stats report cpu, memory, disk and uptime', async () => {
+  const s = await platform.system.stats();
+  assert.equal(typeof s.estimated, 'boolean');
+  assert.ok(s.cpu.usage >= 0 && s.cpu.usage <= 100, 'cpu 0-100');
+  assert.ok(s.cpu.cores >= 1);
+  assert.ok(s.memory.used >= 0 && typeof s.memory.label === 'string');
+  assert.ok(s.disk.total >= 0 && s.disk.used >= 0);
+  assert.ok(s.uptime >= 0);
+});
+
+test('battery and network have the documented shape', async () => {
+  const b = await platform.system.battery();
+  assert.equal(typeof b.supported, 'boolean');
+  assert.ok(b.level >= 0 && b.level <= 1);
+  const n = await platform.system.network();
+  assert.equal(typeof n.online, 'boolean');
+  assert.ok(['wifi', 'ethernet', 'cellular', 'none', 'unknown'].includes(n.type), n.type);
+  assert.ok(Array.isArray(n.interfaces));
+  const off = platform.system.onNetworkChange(() => {}); off();
+});
+
+test('update channel reports a status', () => {
+  const u = platform.updates.status();
+  assert.ok(['idle', 'checking', 'available', 'downloading', 'ready', 'up-to-date', 'error', 'unsupported'].includes(u.state), u.state);
+});
+
+test('key-value store round-trips JSON', async () => {
+  await prefixedKv.set('a', { x: [1, 2, { y: 'z' }] });
+  assert.deepEqual(await prefixedKv.get('a'), { x: [1, 2, { y: 'z' }] });
+  assert.deepEqual(await prefixedKv.keys(''), ['a']);
+  await prefixedKv.delete('a');
+  assert.equal(await prefixedKv.get('a'), undefined);
+});
+
+// ── Paths ─────────────────────────────────────────────────────────────
+
+test('path utilities', () => {
+  assert.equal(P.normalize('/a/./b/../c//d/'), '/a/c/d');
+  assert.equal(P.normalize('../../x'), '/x');
+  assert.equal(P.join('/a', 'b', '../c'), '/a/c');
+  assert.equal(P.resolve('/home/u', 'docs/x.txt'), '/home/u/docs/x.txt');
+  assert.equal(P.resolve('/home/u', '/etc'), '/etc');
+  assert.equal(P.dirname('/a/b/c.txt'), '/a/b');
+  assert.equal(P.dirname('/a'), '/');
+  assert.equal(P.basename('/a/b/c.txt'), 'c.txt');
+  assert.equal(P.basename('/a/b/c.txt', '.txt'), 'c');
+  assert.equal(P.extname('/a/Photo.JPG'), '.jpg');
+  assert.equal(P.extname('/a/.hidden'), '');
+  assert.ok(P.isInside('/a', '/a/b'));
+  assert.ok(!P.isInside('/a', '/ab'));
+  assert.ok(P.validateName('bad/name'));
+  assert.ok(P.validateName('trailing.'));
+  assert.equal(P.validateName('Good name (2).txt'), null);
+});
+
+// ── Event bus ─────────────────────────────────────────────────────────
+
+test('event bus: exact, namespace and global subscriptions', () => {
+  const b = new EventBus();
+  const seen = [];
+  b.on('fs:changed', () => seen.push('exact'));
+  b.on('fs:*', () => seen.push('ns'));
+  b.on('*', () => seen.push('all'));
+  b.on('process:exit', () => seen.push('other'));
+  assert.equal(b.emit('fs:changed', {}), 3);
+  assert.deepEqual(seen, ['exact', 'ns', 'all']);
+});
+
+test('event bus: once, unsubscribe, owners and error isolation', () => {
+  const b = new EventBus();
+  let n = 0;
+  b.once('x:y', () => n++);
+  b.emit('x:y'); b.emit('x:y');
+  assert.equal(n, 1);
+  const off = b.on('x:y', () => n++); off(); b.emit('x:y');
+  assert.equal(n, 1);
+  b.on('x:y', () => { throw new Error('boom'); });
+  b.on('x:y', () => n++, { owner: 42 });
+  b.on('x:z', () => n++, { owner: 42 });
+  b.emit('x:y');
+  assert.equal(n, 2, 'a throwing handler does not stop the others');
+  assert.equal(b.offOwner(42), 2);
+  b.emit('x:y'); b.emit('x:z');
+  assert.equal(n, 2);
+});
+
+test('event bus: waitFor resolves with the payload', async () => {
+  const b = new EventBus();
+  setTimeout(() => b.emit('a:b', 7), 5);
+  assert.equal(await b.waitFor('a:b', { timeout: 500 }), 7);
+  await assert.rejects(b.waitFor('never:happens', { timeout: 20 }));
+});
+
+// ── File system primitives (adapter) ──────────────────────────────────
+
+test('fs: create, read, stat and list', async () => {
+  const fs = platform.fs;
+  await fs.mkdir(`${T}/p`);
+  await fs.writeFile(`${T}/p/hello.txt`, new TextEncoder().encode('héllo 🍩'));
+  const s = await fs.stat(`${T}/p/hello.txt`);
+  assert.equal(s.type, 'file');
+  assert.equal(s.name, 'hello.txt');
+  assert.equal(s.size, new TextEncoder().encode('héllo 🍩').length);
+  assert.ok(s.mtime > 0);
+  assert.equal(new TextDecoder().decode(await fs.readFile(`${T}/p/hello.txt`)), 'héllo 🍩');
+  const list = await fs.readdir(`${T}/p`);
+  assert.deepEqual(list.map((e) => e.name), ['hello.txt']);
+  assert.equal(await fs.stat(`${T}/p/missing`), null);
+});
+
+test('fs: binary data survives a round trip', async () => {
+  const bytes = new Uint8Array(70000).map((_, i) => (i * 31) % 256);
+  await platform.fs.writeFile(`${T}/p/bin.dat`, bytes);
+  const back = await platform.fs.readFile(`${T}/p/bin.dat`);
+  assert.equal(back.length, bytes.length);
+  assert.ok(back.every((v, i) => v === bytes[i]));
+});
+
+test('fs: error codes match on every platform', async () => {
+  const fs = platform.fs;
+  await assert.rejects(fs.readFile(`${T}/nope.txt`), 'ENOENT');
+  await assert.rejects(fs.mkdir(`${T}/p`), 'EEXIST');
+  await assert.rejects(fs.mkdir(`${T}/no/such/parent`), 'ENOENT');
+  await assert.rejects(fs.readFile(`${T}/p`), 'EISDIR');
+  await assert.rejects(fs.readdir(`${T}/p/hello.txt`), 'ENOTDIR');
+  await assert.rejects(fs.writeFile(`${T}/p/hello.txt/x`, new Uint8Array(1)), 'ENOTDIR');
+  await assert.rejects(fs.remove(`${T}/p`, { recursive: false }), 'ENOTEMPTY');
+  await assert.rejects(fs.rename(`${T}/p/hello.txt`, `${T}/p/bin.dat`), 'EEXIST');
+  await assert.rejects(fs.copy(`${T}/p/hello.txt`, `${T}/p/bin.dat`), 'EEXIST');
+});
+
+test('fs: renaming a folder moves everything inside it', async () => {
+  const fs = platform.fs;
+  await fs.mkdir(`${T}/r`); await fs.mkdir(`${T}/r/sub`);
+  await fs.writeFile(`${T}/r/sub/a.txt`, new TextEncoder().encode('A'));
+  await fs.rename(`${T}/r`, `${T}/r2`);
+  assert.equal(await fs.stat(`${T}/r`), null);
+  assert.equal(new TextDecoder().decode(await fs.readFile(`${T}/r2/sub/a.txt`)), 'A');
+  await assert.rejects(fs.rename(`${T}/r2`, `${T}/r2/sub/inside`), 'EINVAL');
+});
+
+test('fs: recursive copy and remove', async () => {
+  const fs = platform.fs;
+  await fs.copy(`${T}/r2`, `${T}/r3`);
+  assert.equal(new TextDecoder().decode(await fs.readFile(`${T}/r3/sub/a.txt`)), 'A');
+  assert.ok(await fs.stat(`${T}/r2/sub/a.txt`), 'source kept');
+  await fs.remove(`${T}/r3`, { recursive: true });
+  assert.equal(await fs.stat(`${T}/r3/sub/a.txt`), null);
+  assert.equal(await fs.stat(`${T}/r3`), null);
+});
+
+test('fs: usage reports numbers', async () => {
+  const u = await platform.fs.usage();
+  assert.ok(u.used >= 0 && u.total >= 0);
+});
+
+// ── VFS ───────────────────────────────────────────────────────────────
+
+test('vfs: text, JSON, recursive mkdir and change events', async () => {
+  const events = [];
+  const off = kernel.bus.on('fs:changed', (e) => events.push(e.op));
+  await kernel.fs.writeText(`${T}/v/deep/note.txt`, 'one', { mkdirp: true });
+  await kernel.fs.appendText(`${T}/v/deep/note.txt`, ' two');
+  assert.equal(await kernel.fs.readText(`${T}/v/deep/note.txt`), 'one two');
+  await kernel.fs.writeJSON(`${T}/v/data.json`, { a: 1 });
+  assert.deepEqual(await kernel.fs.readJSON(`${T}/v/data.json`), { a: 1 });
+  assert.equal(await kernel.fs.readJSON(`${T}/v/missing.json`, 'fallback'), 'fallback');
+  off();
+  assert.ok(events.includes('create') && events.includes('modify'));
+  const e = await kernel.fs.stat(`${T}/v/data.json`);
+  assert.equal(e.kind, 'text'); assert.equal(e.mime, 'application/json');
+});
+
+test('vfs: invalid names are rejected', async () => {
+  await assert.rejects(kernel.fs.writeText(`${T}/v/bad:name.txt`, 'x'), 'EINVAL');
+  await assert.rejects(kernel.fs.rename(`${T}/v/data.json`, 'a/b'), 'EINVAL');
+});
+
+test('vfs: unique names, move with overwrite, copy into itself refused', async () => {
+  assert.equal(await kernel.fs.uniqueName(`${T}/v`, 'data.json'), 'data (2).json');
+  assert.equal(await kernel.fs.uniqueName(`${T}/v`, 'fresh.txt'), 'fresh.txt');
+  await kernel.fs.writeText(`${T}/v/a.txt`, 'A');
+  await kernel.fs.writeText(`${T}/v/b.txt`, 'B');
+  await assert.rejects(kernel.fs.move(`${T}/v/a.txt`, `${T}/v/b.txt`), 'EEXIST');
+  await kernel.fs.move(`${T}/v/a.txt`, `${T}/v/b.txt`, { overwrite: true });
+  assert.equal(await kernel.fs.readText(`${T}/v/b.txt`), 'A');
+  await assert.rejects(kernel.fs.copy(`${T}/v`, `${T}/v/deep/v`), 'EINVAL');
+  await assert.rejects(kernel.fs.move(`${T}/v`, `${T}/v/deep/v`), 'EINVAL');
+});
+
+test('vfs: hidden files are skipped unless asked for', async () => {
+  await kernel.fs.writeText(`${T}/v/.secret`, 's');
+  assert.ok(!(await kernel.fs.readdir(`${T}/v`)).some((e) => e.name === '.secret'));
+  assert.ok((await kernel.fs.readdir(`${T}/v`, { hidden: true })).some((e) => e.name === '.secret'));
+});
+
+test('vfs: search finds names and contents', async () => {
+  await kernel.fs.writeText(`${T}/v/deep/recipe.md`, 'Mix flour with sugar and fry the donut dough.');
+  const byName = await kernel.fs.search(T, 'recipe');
+  assert.ok(byName.some((r) => r.match === 'name' && r.entry.name === 'recipe.md'));
+  const byContent = await kernel.fs.search(T, 'donut dough');
+  assert.equal(byContent.length, 1);
+  assert.equal(byContent[0].match, 'content');
+  assert.ok(byContent[0].snippet.includes('donut dough'));
+});
+
+test('vfs: disk usage of a folder', async () => {
+  const d = await kernel.fs.du(`${T}/v`);
+  assert.ok(d.files >= 4 && d.dirs >= 1 && d.size > 0);
+});
+
+test('recycle bin: delete, list, restore and empty', async () => {
+  const home = `${T}/binhome`;
+  await kernel.fs.writeText(`${home}/Documents/plan.txt`, 'secret plan', { mkdirp: true });
+  await kernel.fs.mkdir(`${home}/Documents/Folder/Inner`, { recursive: true });
+  const info = await kernel.fs.moveToTrash(`${home}/Documents/plan.txt`, home);
+  await kernel.fs.moveToTrash(`${home}/Documents/Folder`, home);
+  assert.ok(!(await kernel.fs.exists(`${home}/Documents/plan.txt`)));
+  const items = await kernel.fs.listTrash(home);
+  assert.equal(items.length, 2);
+  assert.equal(items.find((i) => i.id === info.id).originalPath, `${home}/Documents/plan.txt`);
+  // Something new now occupies the old name: restore must not overwrite it.
+  await kernel.fs.writeText(`${home}/Documents/plan.txt`, 'new');
+  const restored = await kernel.fs.restoreFromTrash(home, info.id);
+  assert.equal(restored, `${home}/Documents/plan (2).txt`);
+  assert.equal(await kernel.fs.readText(restored), 'secret plan');
+  assert.equal((await kernel.fs.listTrash(home)).length, 1);
+  await kernel.fs.emptyTrash(home);
+  assert.equal((await kernel.fs.listTrash(home)).length, 0);
+});
+
+// ── Settings ──────────────────────────────────────────────────────────
+
+test('settings: defaults, validation and persistence', async () => {
+  const bus = new EventBus();
+  const s = new SettingsStore({ kv: prefixedKv, bus });
+  await s.loadSystem();
+  assert.equal(s.get('system.deviceName'), 'DONUT-PC');
+  assert.throws(() => s.get('no.such.key'), 'ESETTING');
+  assert.throws(() => s.set('system.deviceName', 5), 'ESETTING');
+  assert.throws(() => s.set('appearance.theme', 'dark'), 'ESETTING'); // no user signed in yet
+  s.set('system.deviceName', 'KITCHEN');
+  await s.loadUser('u1');
+  assert.equal(s.get('appearance.theme'), 'dark');
+  assert.throws(() => s.set('appearance.theme', 'purple'), 'ESETTING');
+  assert.throws(() => s.set('qs.volume', 101), 'ESETTING');
+  assert.throws(() => s.set('appearance.accent', 'red'), 'ESETTING');
+  s.set('appearance.theme', 'light');
+  s.set('wm.bounds.notepad', { x: 1, y: 2, w: 300, h: 200 });
+  await s.flush();
+  const again = new SettingsStore({ kv: prefixedKv, bus: new EventBus() });
+  await again.loadSystem();
+  await again.loadUser('u1');
+  assert.equal(again.get('system.deviceName'), 'KITCHEN');
+  assert.equal(again.get('appearance.theme'), 'light');
+  assert.deepEqual(again.get('wm.bounds.notepad'), { x: 1, y: 2, w: 300, h: 200 });
+  await again.loadUser('u2');
+  assert.equal(again.get('appearance.theme'), 'dark', 'each user has their own settings');
+  assert.equal(await again.peekUser('u1', 'appearance.theme'), 'light');
+  await prefixedKv.delete('settings:system');
+  await prefixedKv.delete('settings:user:u1');
+});
+
+test('settings: watch, reset and returned copies are isolated', async () => {
+  const bus = new EventBus();
+  const s = new SettingsStore({ kv: prefixedKv, bus });
+  await s.loadSystem(); await s.loadUser('w');
+  const seen = [];
+  const off = s.watch('qs.*', (v, k) => seen.push(`${k}=${v}`));
+  s.set('qs.volume', 30);
+  s.set('qs.volume', 30); // unchanged: no event
+  s.set('appearance.theme', 'light');
+  s.reset('qs.volume');
+  off();
+  assert.deepEqual(seen, ['qs.volume=30', 'qs.volume=70']);
+  const pinned = s.get('taskbar.pinned');
+  pinned.push('mutated');
+  assert.ok(!s.get('taskbar.pinned').includes('mutated'));
+  await s.flush();
+  await prefixedKv.delete('settings:user:w');
+});
+
+// ── Registry, permissions, associations ───────────────────────────────
+
+test('manifest validation explains what is wrong', () => {
+  assert.deepEqual(validateManifest({ id: 'good.app', name: 'Good', version: '1.2.3', entry: 'x.js' }), []);
+  const errs = validateManifest({ id: 'Bad ID', name: '', version: 'one', permissions: ['teleport'], fileTypes: ['txt'] });
+  assert.ok(errs.length >= 5, errs.join('; '));
+});
+
+test('session: signing in loads the user and creates their folders', async () => {
+  await kernel.setSessionUser(USER);
+  assert.equal(kernel.settings.currentUser, USER.id);
+  for (const f of ['Desktop', 'Documents', 'Downloads', 'Pictures', 'Music', 'Videos']) assert.ok(await kernel.fs.isDir(`${USER.home}/${f}`), f);
+});
+
+test('permissions: undeclared, system, prompted and master switch', async () => {
+  const sys = kernel.registry.register(app('sys', { module: { default() {} }, permissions: ['camera', 'files.read'] }), { builtin: true });
+  const third = kernel.registry.register(app('third', { module: { default() {} }, permissions: ['files.read', 'camera', 'notifications'] }));
+  assert.equal(kernel.permissions.status(sys.id, 'files.read'), 'granted');
+  assert.equal(kernel.permissions.status(sys.id, 'network'), 'undeclared');
+  assert.equal(await kernel.permissions.request(sys.id, 'network'), false);
+  assert.equal(kernel.permissions.status(third.id, 'files.read'), 'prompt');
+
+  const asked = [];
+  kernel.permissions.setPrompter(async (q) => { asked.push(q.permission); return q.permission === 'files.read' ? 'granted' : q.permission === 'notifications' ? 'once' : 'denied'; });
+  assert.equal(await kernel.permissions.request(third.id, 'files.read'), true);
+  assert.equal(await kernel.permissions.request(third.id, 'files.read'), true);
+  assert.equal(await kernel.permissions.request(third.id, 'camera'), false);
+  assert.equal(await kernel.permissions.request(third.id, 'camera'), false);
+  assert.deepEqual(asked, ['files.read', 'camera'], 'each permission is asked only once');
+  assert.equal(await kernel.permissions.request(third.id, 'notifications'), true);
+  assert.equal(kernel.settings.get('privacy.grants')[third.id].notifications, undefined, '"allow once" is not stored');
+
+  kernel.permissions.reset(third.id, 'camera');
+  assert.equal(kernel.permissions.status(third.id, 'camera'), 'prompt');
+  kernel.settings.set('privacy.camera', false);
+  assert.equal(kernel.permissions.status(sys.id, 'camera'), 'blocked', 'master switch beats system grants');
+  kernel.settings.set('privacy.camera', true);
+  kernel.permissions.setPrompter(null);
+  assert.equal(await kernel.permissions.request(third.id, 'camera'), false, 'no prompter: fail closed');
+});
+
+test('file associations pick a default and honour user choice', () => {
+  const a = kernel.registry.register(app('viewer-a', { module: { default() {} }, fileTypes: ['.zzq'] }), { builtin: true });
+  const b = kernel.registry.register(app('viewer-b', { module: { default() {} }, fileTypes: ['.zzq'] }));
+  assert.equal(kernel.associations.defaultFor('.zzq'), a.id, 'built-in wins by default');
+  kernel.associations.setDefault('.ZZQ', b.id);
+  assert.equal(kernel.associations.appForPath('/x/file.zzq'), b.id);
+  assert.throws(() => kernel.associations.setDefault('.zzq', 'nonexistent'));
+  kernel.associations.clearDefault('.zzq');
+  assert.equal(kernel.associations.defaultFor('.zzq'), a.id);
+  assert.equal(kernel.associations.defaultFor('.nothingopensthis'), null);
+});
+
+// ── Processes ─────────────────────────────────────────────────────────
+
+test('processes: spawn, PIDs, ctx and clean kill', async () => {
+  let ticks = 0, exited = false, busHits = 0;
+  const el = document.createElement('div');
+  el.innerHTML = '<p></p><p></p>';
+  document.body.append(el);
+  const m = kernel.registry.register(app('ticker', {
+    module: {
+      default(ctx) {
+        ctx.setInterval(() => { ticks++; }, 5);
+        ctx.bus.on('test:ping', () => busHits++);
+        ctx.listen(window, 'test-event', () => busHits++);
+        ctx.ownElement(el);
+        ctx.onExit(() => { exited = true; });
+      },
+    },
+  }));
+  const p1 = await kernel.launch(m.id, { hello: 1 });
+  const p2 = await kernel.launch(m.id);
+  assert.ok(p2.pid > p1.pid, 'PIDs increase');
+  assert.equal(p1.state, 'running');
+  assert.deepEqual(p1.args, { hello: 1 });
+  assert.equal(kernel.processes.byApp(m.id).length, 2);
+  await sleep(40);
+  assert.ok(ticks > 0, 'timers run');
+  kernel.bus.emit('test:ping');
+  assert.equal(busHits, 2, 'both processes got the event');
+  const exitEvent = kernel.bus.waitFor('process:exit', { filter: (e) => e.pid === p1.pid });
+  await kernel.processes.kill(p1.pid);
+  await exitEvent;
+  assert.ok(exited, 'onExit ran');
+  assert.ok(!document.body.contains(el), 'owned elements removed');
+  assert.equal(kernel.processes.get(p1.pid), null);
+  await kernel.processes.kill(p2.pid);
+  const before = ticks; await sleep(40);
+  assert.equal(ticks, before, 'timers stopped after kill');
+  busHits = 0;
+  kernel.bus.emit('test:ping');
+  window.dispatchEvent(new Event('test-event'));
+  assert.equal(busHits, 0, 'listeners removed after kill');
+  await assert.rejects(kernel.processes.kill(99999), 'ESRCH');
+});
+
+test('processes: single-instance apps are activated, not duplicated', async () => {
+  const activations = [];
+  const m = kernel.registry.register(app('single', { singleInstance: true, module: { default(ctx) { ctx.onActivate((a) => activations.push(a)); } } }));
+  const [a, b] = await Promise.all([kernel.launch(m.id), kernel.launch(m.id, { file: 'x' })]);
+  const c = await kernel.launch(m.id, { file: 'y' });
+  assert.equal(a.pid, b.pid); assert.equal(a.pid, c.pid);
+  assert.deepEqual(activations, [{ file: 'x' }, { file: 'y' }]);
+  await kernel.processes.kill(a.pid);
+});
+
+test('processes: a crashing app is cleaned up and reported', async () => {
+  const m = kernel.registry.register(app('crashy', { module: { default() { throw new Error('kaboom'); } } }));
+  const crash = kernel.bus.waitFor('process:crash', { filter: (e) => e.appId === m.id, timeout: 2000 });
+  await assert.rejects(kernel.launch(m.id), 'ECRASH');
+  assert.equal((await crash).error, 'kaboom');
+  assert.equal(kernel.processes.byApp(m.id).length, 0);
+  await assert.rejects(kernel.launch('no.such.app'), 'ENOAPP');
+});
+
+test('processes: critical processes resist kill, CPU is measured', async () => {
+  await assert.rejects(kernel.processes.kill(kernel.kernelProcess.pid), 'EPERM');
+  const m = kernel.registry.register(app('burner', {
+    module: { default(ctx) { ctx.setInterval(() => { const t = performance.now(); while (performance.now() - t < 20); }, 50); } },
+  }));
+  const p = await kernel.launch(m.id);
+  await kernel.bus.waitFor('process:sample', { timeout: 3000 });
+  await kernel.bus.waitFor('process:sample', { timeout: 3000 });
+  assert.ok(p.cpu > 5, `expected noticeable CPU, got ${p.cpu.toFixed(1)}%`);
+  assert.ok(p.memory > 0);
+  await kernel.processes.kill(p.pid);
+});
+
+test('processes: apps cannot forge system events', async () => {
+  let err = null;
+  const m = kernel.registry.register(app('forger', { module: { default(ctx) { try { ctx.bus.emit('process:exit', {}); } catch (e) { err = e; } } } }));
+  const p = await kernel.launch(m.id);
+  assert.equal(err?.code, 'EPERM');
+  await kernel.processes.kill(p.pid);
+});
+
+test('ctx.fs enforces permissions and resolves relative to home', async () => {
+  let ctxRef;
+  kernel.permissions.setPrompter(async () => 'denied');
+  const reader = kernel.registry.register(app('reader', { permissions: ['files.read'], module: { default(ctx) { ctxRef = ctx; } } }), { builtin: true });
+  const p = await kernel.launch(reader.id);
+  await kernel.fs.writeText(`${USER.home}/Documents/x.txt`, 'mine');
+  assert.equal(await ctxRef.fs.readText('Documents/x.txt'), 'mine');
+  await assert.rejects(ctxRef.fs.writeText('Documents/y.txt', 'no'), 'PermissionError');
+  await assert.rejects(ctxRef.fs.readText('/System/version.json'), 'PermissionError');
+  await kernel.processes.kill(p.pid);
+  kernel.permissions.setPrompter(null);
+});
+
+test('ctx.storage is private per app and persists per user', async () => {
+  let ctxA, ctxB;
+  const a = kernel.registry.register(app('store-a', { module: { default(ctx) { ctxA = ctx; } } }));
+  const b = kernel.registry.register(app('store-b', { module: { default(ctx) { ctxB = ctx; } } }));
+  const pa = await kernel.launch(a.id), pb = await kernel.launch(b.id);
+  ctxA.storage.set('highScore', 42);
+  assert.equal(ctxA.storage.get('highScore'), 42);
+  assert.equal(ctxB.storage.get('highScore', 'none'), 'none');
+  assert.deepEqual(ctxA.storage.keys(), ['highScore']);
+  assert.throws(() => ctxA.storage.set('../escape', 1));
+  ctxA.storage.remove('highScore');
+  assert.equal(ctxA.storage.get('highScore'), null);
+  await kernel.processes.kill(pa.pid); await kernel.processes.kill(pb.pid);
+});
+
+test('notifications: posting, Do Not Disturb and per-app mute', async () => {
+  let ctxRef;
+  const n = kernel.registry.register(app('notifier', { permissions: ['notifications'], module: { default(ctx) { ctxRef = ctx; } } }), { builtin: true });
+  const p = await kernel.launch(n.id);
+  const posted = kernel.bus.waitFor('notification:posted', { timeout: 1000 });
+  const first = await ctxRef.notify({ title: 'Hello', body: 'World' });
+  assert.equal((await posted).id, first.id);
+  assert.equal(first.silent, false);
+  kernel.notifications.setDnd(true);
+  assert.equal((await ctxRef.notify({ title: 'Quiet' })).silent, true);
+  kernel.notifications.setDnd(false);
+  kernel.settings.set('notifications.perApp', { [n.id]: false });
+  assert.equal(await ctxRef.notify({ title: 'Muted' }), null);
+  kernel.settings.set('notifications.perApp', {});
+  assert.ok(kernel.notifications.list().filter((x) => x.appId === n.id).length === 2);
+  kernel.notifications.clear(n.id);
+  assert.equal(kernel.notifications.list().filter((x) => x.appId === n.id).length, 0);
+  await kernel.processes.kill(p.pid);
+});
+
+test('installed apps persist and run from stored source', async () => {
+  const manifest = app('installed', {
+    source: 'export default function main(ctx) { ctx.storage.set("ran", true); }',
+    permissions: [],
+  });
+  await kernel.registry.install(manifest);
+  const p = await kernel.launch(manifest.id);
+  assert.equal(kernel.settings.get(`app.${manifest.id}.ran`), true);
+  await kernel.processes.kill(p.pid);
+  const stored = await platform.kv.get('apps:installed');
+  assert.ok(stored.some((r) => r.id === manifest.id));
+  await kernel.registry.uninstall(manifest.id);
+  assert.ok(!kernel.registry.has(manifest.id));
+  assert.ok(!(await platform.kv.get('apps:installed')).some((r) => r.id === manifest.id));
+});
+
+test('kernel.open uses file associations', async () => {
+  const opened = [];
+  const m = kernel.registry.register(app('opener', { fileTypes: ['.zzo'], module: { default(ctx) { opened.push(ctx.args.path); } } }), { builtin: true });
+  await kernel.fs.writeText(`${USER.home}/Documents/thing.zzo`, 'x');
+  const p = await kernel.open(`${USER.home}/Documents/thing.zzo`);
+  assert.deepEqual(opened, [`${USER.home}/Documents/thing.zzo`]);
+  assert.equal(kernel.settings.get('start.recentFiles')[0].path, `${USER.home}/Documents/thing.zzo`);
+  await kernel.processes.kill(p.pid);
+  const ask = kernel.bus.waitFor('kernel:openWith', { timeout: 1000 });
+  await kernel.fs.writeText(`${USER.home}/Documents/odd.unknownext`, 'x');
+  assert.equal(await kernel.open(`${USER.home}/Documents/odd.unknownext`), null);
+  assert.equal((await ask).path, `${USER.home}/Documents/odd.unknownext`);
+  void m;
+});
+
+test('signing out ends the user\'s apps', async () => {
+  const m = kernel.registry.register(app('lingering', { module: { default() {} } }));
+  await kernel.launch(m.id);
+  await kernel.setSessionUser(null);
+  assert.equal(kernel.processes.byApp(m.id).length, 0);
+  assert.equal(kernel.settings.currentUser, null);
+});
+
+run({
+  platform: platform.name,
+  async teardown() {
+    for (const id of testApps) kernel.registry.unregister(id);
+    await kernel.fs.remove(T, { recursive: true }).catch(() => {});
+    await platform.kv.delete(`settings:user:${USER.id}`);
+    for (const k of await platform.kv.keys(`test:${RUN}:`)) await platform.kv.delete(k);
+  },
+});

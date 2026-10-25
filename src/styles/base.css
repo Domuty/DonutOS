@@ -1,0 +1,50 @@
+/* Design tokens shared by the whole system. Themes override these on :root. */
+:root {
+  color-scheme: dark;
+  --accent: #e8618c;
+  --accent-contrast: #ffffff;
+  --bg: #14101a;
+  --surface: rgba(32, 27, 38, 0.82);
+  --surface-solid: #201b26;
+  --surface-2: rgba(255, 255, 255, 0.06);
+  --border: rgba(255, 255, 255, 0.09);
+  --text: #f4eff7;
+  --text-2: rgba(244, 239, 247, 0.68);
+  --text-3: rgba(244, 239, 247, 0.45);
+  --ok: #6fdc8c;
+  --warn: #ffcf5c;
+  --danger: #ff6b6b;
+  --radius-s: 4px;
+  --radius: 8px;
+  --radius-l: 12px;
+  --shadow: 0 8px 32px rgba(0, 0, 0, 0.45);
+  --font: "Segoe UI Variable", "Segoe UI", system-ui, -apple-system, "Inter", "Roboto", "Helvetica Neue", Arial, sans-serif;
+  --font-mono: "Cascadia Mono", "JetBrains Mono", ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+  --ease-out: cubic-bezier(0.1, 0.9, 0.2, 1);
+}
+
+*, *::before, *::after { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  height: 100%;
+  overflow: hidden;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font);
+  font-size: 14px;
+  -webkit-font-smoothing: antialiased;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+#root { position: fixed; inset: 0; }
+
+button, input, select, textarea { font: inherit; color: inherit; }
+input, textarea, [contenteditable] { user-select: text; -webkit-user-select: text; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: 1ms !important; transition-duration: 1ms !important; }
+}

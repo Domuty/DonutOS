@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>DonutOS core tests</title>
+  <link rel="icon" href="../assets/brand/logo.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="../styles/base.css">
+  <style>
+    body { overflow: auto; user-select: text; padding: 24px clamp(16px, 4vw, 48px); }
+    header { display: flex; align-items: center; gap: 12px; margin-bottom: 16px; }
+    header img { width: 36px; }
+    h1 { font-size: 20px; margin: 0; font-weight: 600; }
+    #summary { margin-left: auto; font-weight: 600; }
+    a { color: var(--accent); }
+    ol { list-style: none; padding: 0; margin: 0; font-family: var(--font-mono); font-size: 12.5px; }
+    li { padding: 5px 8px; border-bottom: 1px solid var(--border); }
+    li.ok::before { content: "✔ "; color: var(--ok); }
+    li.fail { background: rgba(255, 107, 107, .08); }
+    li.fail::before { content: "✘ "; color: var(--danger); }
+    li small { display: block; color: var(--danger); white-space: pre-wrap; margin: 4px 0 0 18px; }
+    li .ms { color: var(--text-3); float: right; }
+  </style>
+</head>
+<body>
+  <header>
+    <img src="../assets/brand/logo.svg" alt="">
+    <h1>DonutOS core tests</h1>
+    <a href="../index.html">Back to DonutOS</a>
+    <span id="summary">Running…</span>
+  </header>
+  <ol id="results"></ol>
+  <script type="module" src="core.test.js"></script>
+</body>
+</html>
