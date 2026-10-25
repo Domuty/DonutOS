@@ -319,6 +319,9 @@ export class VirtualFileSystem {
     });
   }
 
+  /** Tells File Explorer & co. that the host changed a file directly (e.g. a finished download). */
+  noteExternalChange(path, op = 'create') { this.#changed(op, P.normalize(path)); }
+
   // ── Internals ────────────────────────────────────────────────────────
 
   #decorate(s) {

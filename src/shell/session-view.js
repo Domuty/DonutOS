@@ -1,5 +1,6 @@
 // One signed-in user's screen: wallpaper, desktop icons, windows, taskbar and flyouts.
 
+import { Scheduler } from './scheduler.js';
 import { h } from '../ui/h.js';
 import { paintWallpaper } from './wallpaper.js';
 import { WindowManager } from '../wm/window-manager.js';
@@ -35,6 +36,7 @@ export class SessionView {
 
     this.flyouts = new FlyoutHost(this.flyoutLayer);
     this.weather = new Weather(this.kernel, this.uid);
+    this.scheduler = new Scheduler(this.kernel, this.uid);
     this.wm = new WindowManager({
       kernel: this.kernel, uid: this.uid, layer: this.windowsLayer,
       hooks: {
@@ -107,7 +109,7 @@ export class SessionView {
 
   destroy() {
     for (const d of this.disposers) d();
-    for (const part of [this.taskbar, this.toasts, this.desktop, this.qs, this.nc, this.widgets, this.clipboard, this.weather, this.flyouts, this.wm]) part?.destroy?.();
+    for (const part of [this.taskbar, this.toasts, this.desktop, this.qs, this.nc, this.widgets, this.clipboard, this.weather, this.scheduler, this.flyouts, this.wm]) part?.destroy?.();
     if (this.micaUrl) URL.revokeObjectURL(this.micaUrl);
     this.el.remove();
   }

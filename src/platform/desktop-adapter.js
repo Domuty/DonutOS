@@ -3,6 +3,7 @@
 // Documents/DonutOS, and system stats come from the operating system.
 
 import { FsError, DonutError } from '../core/errors.js';
+import { createWebviewView } from './desktop/web-view.js';
 import { batteryStatus, onBatteryChange, browserNetwork, onBrowserNetworkChange, fullscreenApi } from './common/browser-apis.js';
 
 export function createDesktopAdapter(native = window.donutNative) {
@@ -87,6 +88,16 @@ export function createDesktopAdapter(native = window.donutNative) {
       importFiles: (opts = {}) => call('host:importFiles', opts),
       exportFile: (name, data, mime) => call('host:exportFile', name, data, mime),
       openExternal: (url) => call('host:openExternal', url),
+    },
+
+    browser: {
+      kind: 'webview',
+      createView: ({ partition } = {}) => createWebviewView({ partition, native }),
+      setDownloadDir: (vpath) => call('browser:setDownloadDir', vpath),
+      onDownload: (cb) => native.on('browser:download', cb),
+      cancelDownload: (id) => call('browser:cancelDownload', id),
+      onOpenRequest: (cb) => native.on('browser:open', cb),
+      clearData: (what) => call('browser:clearData', what || {}),
     },
 
     updates: {

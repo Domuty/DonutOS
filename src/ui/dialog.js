@@ -64,11 +64,11 @@ export const confirmDialog = (title, message, { ok = 'OK', cancel = 'Cancel', da
     buttons: [{ label: ok, value: true, primary: !danger, danger }, { label: cancel, value: false }], ...opts });
 
 /** Asks for one line of text. Resolves with the text, or null when cancelled. */
-export async function promptDialog(title, { label = '', value = '', placeholder = '', ok = 'OK', validate } = {}) {
+export async function promptDialog(title, { label = '', value = '', placeholder = '', ok = 'OK', validate, parent } = {}) {
   const input = h('input.input', { value, placeholder, 'aria-label': label || title, autofocus: true });
   const err = h('div.error-text');
   const res = await dialog({
-    title, cancelValue: null,
+    title, cancelValue: null, parent,
     body: h('div.field', label ? h('label', label) : null, input, err),
     buttons: [{ label: ok, value: 'ok', primary: true, validate: async () => {
       const msg = validate ? await validate(input.value) : null;

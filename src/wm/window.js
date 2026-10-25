@@ -125,12 +125,15 @@ export class AppWindow {
     let base = { ...this.bounds };
     let moved = false, frame = 0, last = e;
     const target = e.currentTarget;
-    target.setPointerCapture(e.pointerId);
+    // Capture only once the pointer really drags: capturing on press would turn a click on a
+    // tab (or anything else in the title bar) into a click on the title bar itself.
     const move = (ev) => {
+      if (ev.pointerId !== e.pointerId) return;
       last = ev;
       if (!moved && Math.hypot(ev.clientX - startX, ev.clientY - startY) < 4) return;
       if (!moved) {
         moved = true;
+        try { target.setPointerCapture(e.pointerId); } catch { /* pointer already released */ }
         this.el.classList.add('moving');
         if (this.state === 'maximized') {
           // Restore under the cursor, keeping the grab point proportional.
@@ -158,9 +161,10 @@ export class AppWindow {
       });
     };
     const up = (ev) => {
-      target.removeEventListener('pointermove', move);
-      target.removeEventListener('pointerup', up);
-      target.removeEventListener('pointercancel', up);
+      if (ev.pointerId !== e.pointerId) return;
+      document.removeEventListener('pointermove', move);
+      document.removeEventListener('pointerup', up);
+      document.removeEventListener('pointercancel', up);
       cancelAnimationFrame(frame);
       this.el.classList.remove('moving');
       if (moved) {
@@ -168,9 +172,9 @@ export class AppWindow {
         this.wm.dragEnd?.(this, ev);
       }
     };
-    target.addEventListener('pointermove', move);
-    target.addEventListener('pointerup', up);
-    target.addEventListener('pointercancel', up);
+    document.addEventListener('pointermove', move);
+    document.addEventListener('pointerup', up);
+    document.addEventListener('pointercancel', up);
   }
 
   startResize(e, dir) {

@@ -80,6 +80,16 @@ export const ADAPTER_SHAPE = {
     openExternal: 'function',     // async (url) => void
   },
 
+  browser: {                      // web pages for the Browser app (see platform/common/web-view.js)
+    kind: 'string',               // 'frame' (web build, <iframe>) | 'webview' (desktop, separate browser process)
+    createView: 'function',       // ({ partition }) => WebView
+    setDownloadDir: 'function',   // async (virtualPath) => void   (where downloads go; desktop only, web: browser's own)
+    onDownload: 'function',       // (cb({ id, name, path, state, received, total })) => unsubscribe
+    cancelDownload: 'function',   // async (id) => void
+    onOpenRequest: 'function',    // (cb({ url })) => unsubscribe   (a page asked for a new window)
+    clearData: 'function',        // async ({ cache, cookies, storage }) => void
+  },
+
   updates: {
     status: 'function',           // () => Update
     check: 'function',            // async () => Update

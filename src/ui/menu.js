@@ -9,7 +9,7 @@ let open = null;
 
 export function closeMenu() { open?.(); }
 
-export function showMenu(items, { x, y, anchor, placement = 'below', parent = document.body } = {}) {
+export function showMenu(items, { x, y, anchor, placement = 'below', align = 'center', parent = document.body, onKey: extraKey } = {}) {
   closeMenu();
   const previousFocus = document.activeElement;
   const previousWindow = previousFocus?.closest?.('.win');
@@ -26,8 +26,8 @@ export function showMenu(items, { x, y, anchor, placement = 'below', parent = do
   let left = x, top = y;
   if (anchor) {
     const a = anchor.getBoundingClientRect();
-    left = a.left + a.width / 2 - r.width / 2;
-    top = placement === 'above' ? a.top - r.height - 8 : a.bottom + 8;
+    left = align === 'start' ? a.left : a.left + a.width / 2 - r.width / 2;
+    top = placement === 'above' ? a.top - r.height - 8 : a.bottom + (align === 'start' ? 2 : 8);
     if (placement === 'above') menu.classList.add('up');
   }
   left = Math.max(8, Math.min(left, innerWidth - r.width - 8));
@@ -38,6 +38,7 @@ export function showMenu(items, { x, y, anchor, placement = 'below', parent = do
   const onKey = (e) => {
     const btns = [...menu.querySelectorAll('button:not(:disabled)')];
     const i = btns.indexOf(document.activeElement);
+    if (extraKey?.(e, close)) return;
     if (e.key === 'Escape') { e.preventDefault(); close(); anchor?.focus(); }
     else if (e.key === 'ArrowDown') { e.preventDefault(); btns[(i + 1) % btns.length]?.focus(); }
     else if (e.key === 'ArrowUp') { e.preventDefault(); btns[(i - 1 + btns.length) % btns.length]?.focus(); }

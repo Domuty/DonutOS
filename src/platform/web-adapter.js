@@ -1,6 +1,7 @@
 // Web platform adapter: IndexedDB file system and settings, browser APIs for the rest,
 // and a service worker for offline use and updates.
 
+import { createFrameView } from './common/web-view.js';
 import { openDb, req, tx } from './web/idb.js';
 import { IdbFileSystem } from './web/idb-fs.js';
 import {
@@ -199,6 +200,17 @@ export function createWebAdapter({ dbName = DB_NAME } = {}) {
         if (!/^(https?:|mailto:)/i.test(url)) throw new Error('Only web and mail links can be opened');
         window.open(url, '_blank', 'noopener,noreferrer');
       },
+    },
+
+    // Pages load in sandboxed iframes; the browser itself handles downloads and storage.
+    browser: {
+      kind: 'frame',
+      createView: () => createFrameView(),
+      setDownloadDir: async () => {},
+      onDownload: () => () => {},
+      cancelDownload: async () => {},
+      onOpenRequest: () => () => {},
+      clearData: async () => {},
     },
 
     updates: {

@@ -13,12 +13,13 @@ export class FileAssociations {
     this.#bus = bus;
   }
 
-  /** Apps able to open the extension, built-in first then by name. */
+  /** Apps able to open the extension: built-in first, then apps that prefer it, then by name. */
   handlersFor(ext) {
     ext = ext.toLowerCase();
+    const prefers = (a) => ((a.preferredTypes || []).includes(ext) ? 1 : 0);
     return this.#registry.list({ includeHidden: true })
       .filter((a) => (a.fileTypes || []).includes(ext))
-      .sort((a, b) => (b.builtin - a.builtin) || a.name.localeCompare(b.name));
+      .sort((a, b) => (b.builtin - a.builtin) || (prefers(b) - prefers(a)) || a.name.localeCompare(b.name));
   }
 
   /** The app id that opens `ext`, or null if nothing can. */

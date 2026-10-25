@@ -3,12 +3,14 @@
 A desktop operating system environment that runs in your browser (and installs as a PWA) or as a
 fullscreen desktop app (Electron). One codebase, two hosts, no visible differences.
 
-> Status: **phase 5 of 9** — kernel and platform adapters (1); boot, setup, lock screen, accounts,
+> Status: **phase 6 of 9** — kernel and platform adapters (1); boot, setup, lock screen, accounts,
 > sign-in (2); desktop, taskbar, Start, Search, Quick Settings, notifications, widgets, clipboard &
 > emoji, screenshots, Run, windows, Settings and Recycle Bin (3); snapping, snap layouts and groups,
 > virtual desktops, Task View and Alt+Tab (4); File Explorer, Terminal, Task Manager, Settings ›
-> Themes and per-app advanced options (5). The remaining apps arrive in phase 6. A full beginner's
-> guide replaces this README in phase 9.
+> Themes and per-app advanced options (5); Notepad, Writer, Calculator, Paint, Photos, Media
+> Player, Camera, Sound Recorder, Clock, Calendar, Sticky Notes, Browser, Mail, Solitaire and
+> Minesweeper (6). The Store and SDK arrive in phase 7. A full beginner's guide replaces this
+> README in phase 9.
 
 ## Try it
 

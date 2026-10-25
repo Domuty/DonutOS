@@ -19,13 +19,19 @@ const SOUNDS = {
   unlock: [{ f: 880, t: 0, d: 0.25, g: 0.15 }, { f: 1318.5, t: 0.07, d: 0.35, g: 0.12 }],
   notify: [{ f: 987.77, t: 0, d: 0.3, g: 0.18 }, { f: 1479.98, t: 0.09, d: 0.45, g: 0.14 }],
   error: [{ f: 330, t: 0, d: 0.25, type: 'triangle', g: 0.25 }, { f: 262, t: 0.12, d: 0.35, type: 'triangle', g: 0.25 }],
+  // One ring of an alarm or timer; the scheduler repeats it until it's dismissed.
+  alarm: [{ f: 880, t: 0, d: 0.18, g: 0.3 }, { f: 1108.73, t: 0.2, d: 0.18, g: 0.3 }, { f: 1318.51, t: 0.4, d: 0.35, g: 0.3 }, { f: 880, t: 0.9, d: 0.18, g: 0.3 }, { f: 1108.73, t: 1.1, d: 0.18, g: 0.3 }, { f: 1318.51, t: 1.3, d: 0.45, g: 0.3 }],
+  timer: [{ f: 1046.5, t: 0, d: 0.15, type: 'square', g: 0.12 }, { f: 1046.5, t: 0.25, d: 0.15, type: 'square', g: 0.12 }, { f: 1046.5, t: 0.5, d: 0.15, type: 'square', g: 0.12 }, { f: 1318.51, t: 0.75, d: 0.4, type: 'square', g: 0.12 }],
+  chime: [{ f: 659.25, t: 0, d: 1.2, g: 0.25 }, { f: 830.61, t: 0.3, d: 1.2, g: 0.22 }, { f: 987.77, t: 0.6, d: 1.6, g: 0.2 }],
+  reminder: [{ f: 783.99, t: 0, d: 0.35, g: 0.2 }, { f: 1046.5, t: 0.15, d: 0.6, g: 0.18 }],
   shutdown: [{ f: 783.99, t: 0, d: 1 }, { f: 659.25, t: 0.14, d: 1 }, { f: 523.25, t: 0.28, d: 1.4 }],
 };
 
-export function playSound(name, settings) {
+/** Plays a system sound. Alarms (`{ alarm: true }`) ring even when system sounds are off, but not when muted. */
+export function playSound(name, settings, { alarm = false } = {}) {
   try {
     if (settings) {
-      if (!settings.get('sound.enabled') || settings.get('qs.muted')) return;
+      if ((!alarm && !settings.get('sound.enabled')) || settings.get('qs.muted')) return;
     }
     const volume = settings ? settings.get('qs.volume') / 100 : 0.7;
     if (volume <= 0) return;

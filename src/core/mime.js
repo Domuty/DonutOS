@@ -12,7 +12,7 @@ const TYPES = {
   '.mp3': 'audio/mpeg', '.wav': 'audio/wav', '.ogg': 'audio/ogg', '.oga': 'audio/ogg', '.m4a': 'audio/mp4',
   '.flac': 'audio/flac', '.aac': 'audio/aac', '.weba': 'audio/webm',
   '.mp4': 'video/mp4', '.webm': 'video/webm', '.ogv': 'video/ogg', '.mov': 'video/quicktime', '.mkv': 'video/x-matroska',
-  '.pdf': 'application/pdf', '.zip': 'application/zip',
+  '.pdf': 'application/pdf', '.zip': 'application/zip', '.ics': 'text/calendar', '.eml': 'message/rfc822', '.opus': 'audio/ogg', '.m4v': 'video/mp4',
   '.dapp': 'application/x-donut-app', '.lnk': 'application/x-donut-shortcut',
 };
 

@@ -38,6 +38,9 @@ let kv = null;
 let updater = null;
 let allowClose = false; // set when DonutOS itself (or the OS) really wants to quit
 let wantFullscreen = !WINDOWED;
+const BROWSER_PARTITION = 'persist:donut-browser';
+let browserDownloadDir = '';
+const downloads = new Map(); // id -> DownloadItem
 const send = (channel, payload) => { if (win && !win.isDestroyed()) win.webContents.send(channel, payload); };
 
 /** Registers an IPC handler that only answers DonutOS itself and wraps results/errors. */
@@ -123,6 +126,13 @@ function registerIpc() {
     await shell.openExternal(url);
   });
 
+  handle('browser:setDownloadDir', (vpath) => { browserDownloadDir = String(vpath || ''); });
+  handle('browser:cancelDownload', (id) => { downloads.get(id)?.cancel(); });
+  handle('browser:clearData', async ({ cache = true, cookies = false, storage = false } = {}) => {
+    const s = session.fromPartition(BROWSER_PARTITION);
+    if (cache) await s.clearCache();
+    if (cookies || storage) await s.clearStorageData({ storages: [...(cookies ? ['cookies'] : []), ...(storage ? ['localstorage', 'indexdb', 'serviceworkers', 'cachestorage', 'filesystem', 'websql'] : [])] });
+  });
   handle('updates:status', () => updater.status());
   handle('updates:check', () => updater.check());
   handle('updates:install', () => updater.install());
@@ -146,6 +156,59 @@ function serveSource() {
     if (!file.startsWith(SRC + path.sep)) return new Response('Forbidden', { status: 403 });
     return net.fetch(pathToFileURL(file).toString()).catch(() => new Response('Not found', { status: 404 }));
   });
+}
+
+/**
+ * The Browser app's <webview>s: no preload, no Node, sandboxed, web content only, in their
+ * own storage partition. New windows become new Browser tabs; downloads are saved into the
+ * signed-in user's Downloads folder inside the DonutOS sandbox.
+ */
+function guardWebviews() {
+  win.webContents.on('will-attach-webview', (e, prefs, params) => {
+    delete prefs.preload;
+    prefs.nodeIntegration = false;
+    prefs.nodeIntegrationInSubFrames = false;
+    prefs.contextIsolation = true;
+    prefs.sandbox = true;
+    prefs.webSecurity = true;
+    prefs.allowRunningInsecureContent = false;
+    if (params.partition !== BROWSER_PARTITION && params.partition !== 'donut-private') params.partition = BROWSER_PARTITION;
+    if (params.src && !/^(https?:|about:blank|data:text\/html)/i.test(params.src)) e.preventDefault();
+  });
+  app.on('web-contents-created', (_e, contents) => {
+    if (contents.getType() !== 'webview') return;
+    contents.setWindowOpenHandler(({ url }) => {
+      if (/^https?:/i.test(url)) send('browser:open', { url, from: contents.id });
+      return { action: 'deny' };
+    });
+    contents.on('will-navigate', (e, url) => { if (!/^(https?:|about:|data:)/i.test(url)) e.preventDefault(); });
+    contents.on('context-menu', (_e, p) => send('browser:contextMenu', {
+      webContentsId: contents.id, x: p.x, y: p.y, linkURL: p.linkURL, srcURL: p.srcURL, mediaType: p.mediaType,
+      selectionText: p.selectionText, isEditable: p.isEditable, pageURL: p.pageURL,
+    }));
+  });
+  for (const part of [BROWSER_PARTITION, 'donut-private']) {
+    const s = session.fromPartition(part);
+    // Websites don't get the camera, microphone, location or notifications; DonutOS apps do.
+    s.setPermissionRequestHandler((_wc, permission, cb) => cb(['fullscreen', 'clipboard-sanitized-write', 'pointerLock'].includes(permission)));
+    s.on('will-download', (_e, item) => {
+      if (!browserDownloadDir) { item.cancel(); return; }
+      let host;
+      try { host = sandbox.resolve(browserDownloadDir).host; } catch { item.cancel(); return; }
+      const parsed = path.parse(item.getFilename().replace(/[\\/:*?"<>|]/g, '_') || 'download');
+      let name = parsed.base, n = 2;
+      const fs = require('node:fs');
+      while (fs.existsSync(path.join(host, name))) name = `${parsed.name} (${n++})${parsed.ext}`;
+      item.setSavePath(path.join(host, name));
+      const id = `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
+      downloads.set(id, item);
+      const vpath = `${browserDownloadDir.replace(/\/+$/, '')}/${name}`;
+      const report = (state) => send('browser:download', { id, name, path: vpath, url: item.getURL(), state, received: item.getReceivedBytes(), total: item.getTotalBytes() });
+      report('progressing');
+      item.on('updated', (_ev, state) => report(state === 'interrupted' ? 'interrupted' : item.isPaused() ? 'paused' : 'progressing'));
+      item.once('done', (_ev, state) => { downloads.delete(id); report(state); });
+    });
+  }
 }
 
 function lockDownSession() {
@@ -189,7 +252,7 @@ function createWindow() {
       contextIsolation: true,
       nodeIntegration: false,
       sandbox: true,
-      webviewTag: false,
+      webviewTag: true, // the Browser app's pages; locked down in guardWebviews()
       spellcheck: true,
     },
   });
@@ -210,6 +273,7 @@ function createWindow() {
   });
   win.webContents.on('will-navigate', (e, url) => { if (!url.startsWith(ORIGIN + '/')) e.preventDefault(); });
 
+  guardWebviews();
   win.loadURL(`${ORIGIN}/${TESTS ? 'tests/index.html' : 'index.html'}`);
   // Alt+F4 / the window's close button: like a desktop OS, DonutOS decides (close the
   // active app window, or offer to shut down) instead of the host killing it.

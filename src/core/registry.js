@@ -6,6 +6,7 @@
 //   entry: 'apps/notepad/main.js',          // ES module URL, relative to /src
 //   permissions: ['files.read', 'files.write'],
 //   fileTypes: ['.txt', '.md'],              // extensions it can open
+//   preferredTypes: ['.txt'],                // of those, the ones it should open by default
 //   singleInstance: false, category: 'Productivity', description: '...',
 //   window: { width: 800, height: 600, minWidth: 320, minHeight: 200 },
 //   hidden: false                             // hide from Start / search (system services)

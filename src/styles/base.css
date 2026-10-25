@@ -76,6 +76,7 @@ html, body {
   margin: 0;
   height: 100%;
   overflow: hidden;
+  overflow: clip;
   background: #000;
   color: var(--text);
   font-family: var(--font);
@@ -86,7 +87,8 @@ html, body {
   -webkit-tap-highlight-color: transparent;
 }
 
-#root { position: fixed; inset: 0; overflow: hidden; }
+/* clip (not hidden) so focusing something can never scroll the desktop itself. */
+#root { position: fixed; inset: 0; overflow: clip; }
 
 button, input, select, textarea { font: inherit; color: inherit; }
 [hidden] { display: none !important; }

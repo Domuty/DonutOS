@@ -48,7 +48,7 @@ Everything above it talks to the adapter interface (`src/platform/adapter.js`), 
 
 ## Folder tree
 
-Files marked ✅ exist now (phases 1–5). The rest are created in the phase shown.
+Files marked ✅ exist now (phases 1–6). The rest are created in the phase shown.
 
 ```
 donutos/
@@ -145,16 +145,17 @@ donutos/
     │   ├── snap.js                       ✅ edge/corner snapping, layouts, Snap Assist, groups, shake, Win+Arrow
     │   ├── virtual-desktops.js, task-view.js, alt-tab.js  ✅
     ├── lib/zip.js               ✅ zip/unzip over the DonutOS file API (vendored JSZip, zip-slip safe)
-    ├── ui/                      ✅ h.js (DOM helper), icons.js, avatar.js, dialog.js, menu.js
+    ├── ui/                      ✅ h.js (DOM helper), icons.js, avatar.js, dialog.js, menu.js, menubar.js, file-dialog.js
     ├── apps/
     │   ├── index.js             ✅ built-in manifest list (filled as apps arrive)
     │   ├── settings/ recyclebin/ snipping/ console/                           ✅
     │   ├── explorer/            ✅ main.js (tabs, nav, address bar, search), view.js (5 views), actions.js (zip, import/export)
     │   ├── terminal/            ✅ shell.js (parser/interpreter), commands.js, js-worker.js, main.js
     │   ├── taskmanager/         ✅ main.js (processes, performance, startup, users, details), graph.js
-    │   ├── notepad/ writer/ calculator/ paint/ photos/ mediaplayer/           6
-    │   ├── camera/ recorder/ clock/ calendar/ stickynotes/ browser/ mail/     6
-    │   ├── solitaire/ minesweeper/                                            6
+    │   ├── common/              ✅ document.js (open/save/unsaved changes), print.js
+    │   ├── notepad/ writer/ calculator/ paint/ photos/ mediaplayer/           ✅
+    │   ├── camera/ recorder/ clock/ calendar/ stickynotes/ browser/ mail/     ✅
+    │   ├── solitaire/ minesweeper/                                            ✅
     │   └── store/               7  catalog in store/catalog/*.dapp
     ├── sdk/                     7  donut-sdk.js (typed helpers over ctx), example app
     └── tests/                   ✅ core test suite (runs on whichever platform is active)
@@ -176,12 +177,13 @@ Defined (with exact return shapes) in [`src/platform/adapter.js`](../src/platfor
 | `host` | `importFiles`, `exportFile`, `openExternal` |
 | `updates` | `status`, `check`, `install`, `onStatus` |
 
+| `browser` | `kind`, `createView`, `setDownloadDir`, `onDownload`, `cancelDownload`, `onOpenRequest`, `clearData` |
 | `capture` | `screen` — the web build uses `getDisplayMedia` (the browser asks each time); the desktop build uses `webContents.capturePage` (no prompt) |
 
 `power.onCloseRequest` lets the desktop build turn Alt+F4 / the host close button into
-"close the active app window, or offer to shut down", like a desktop OS. One more group lands
-with the app that needs it: `browser` (phase 6) — a sandboxed `<iframe>` on the web, a
-`WebContentsView` on the desktop so sites that refuse iframes still load.
+"close the active app window, or offer to shut down", like a desktop OS. The `browser` group gives the Browser app its
+web pages: a sandboxed `<iframe>` on the web, an Electron `<webview>` on the desktop (a separate,
+locked-down browser process, so sites that refuse iframes still load).
 
 The fs primitives are deliberately small; `core/vfs.js` builds everything else (recursive
 mkdir, overwrite-aware move, unique names, search, the Recycle Bin) once, for both platforms.
@@ -338,6 +340,37 @@ focus is a timed do-not-disturb.
 - **Settings**: Personalization › Themes (8 presets + saved custom themes in
   `appearance.customThemes`); Apps › Installed apps › Advanced options (`appinfo` page:
   permissions, startup, file types, terminate, reset data and permission choices, uninstall).
+
+## Everyday apps (phase 6)
+
+- **Shared pieces**: `ui/file-dialog.js` (Open / Save As inside the app's window, through the
+  app's permission-checked `ctx.fs`), `ui/menubar.js`, `apps/common/document.js` (current file,
+  unsaved-changes prompt, Save/Save As, titles) and `apps/common/print.js` (host print dialog,
+  which also saves PDFs). New ctx APIs: `ctx.media.getUserMedia` (camera/microphone permissions;
+  streams stop when the app exits), `ctx.addRecent`, `ctx.browser`.
+- **Background scheduler** (`shell/scheduler.js`, one per signed-in user): rings Clock alarms and
+  timers and shows Calendar reminders even when those apps are closed; Snooze/Dismiss are handled
+  there (notifications with `data.service` aren't routed to the app). Alarm times follow the
+  user's time-zone setting.
+- **File types**: `preferredTypes` in a manifest picks the default handler among built-in apps
+  (Photos for pictures, Media Player for audio/video, Browser for .html/.pdf, Notepad for .txt).
+  Writer's own format is `.ddoc` (HTML inside).
+- **Writer / Sticky Notes / Mail** sanitise HTML with an allow-list (`apps/writer/convert.js`): no
+  scripts, event handlers or remote code. Mail shows messages in a script-less sandboxed frame with
+  a strict CSP and blocks remote pictures until asked.
+- **Browser**: `platform/common/web-view.js` (iframe) and `platform/desktop/web-view.js`
+  (`<webview>`) share one interface. On the desktop, `electron/main.js` forces every webview to
+  have no preload, no Node, `sandbox` and `contextIsolation`, its own partition
+  (`persist:donut-browser`, or in-memory for private windows), blocks camera/mic/location for
+  websites, turns pop-ups into tabs and saves downloads into the user's Downloads folder. Local
+  HTML/SVG files open with an opaque origin so they can never reach DonutOS.
+  The web build can't read cross-origin frames: titles show the site name, Back/Forward cover
+  pages opened from DonutOS, Find/Print use the host browser, and sites that forbid framing stay
+  blank (a notice offers to open them in a real browser tab).
+- **Mail** (`core/mail.js`): real delivery between this device's accounts (`name@device.local`),
+  stored per user in the key-value store so it reaches people who are signed out. Outside
+  addresses are handed to the computer's email app (`mailto:`) — a web page can't log in to
+  IMAP/SMTP servers. `.eml` import/export (`apps/mail/eml.js`, MIME + base64/quoted-printable).
 
 ## Security notes (desktop)
 

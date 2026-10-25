@@ -1,6 +1,8 @@
 // The DonutOS kernel: creates every core service, wires them together, and builds the
 // API (ctx) that apps receive. The shell and apps reach the system only through here.
 
+import { MailService } from './mail.js';
+import { createFrameView } from '../platform/common/web-view.js';
 import { EventBus } from './event-bus.js';
 import { SettingsStore } from './settings.js';
 import { AppRegistry } from './registry.js';
@@ -36,6 +38,8 @@ export class Kernel {
     this.sessions = new Map();       // uid -> { user, startedAt } for everyone signed in
     this.shortcuts = new ShortcutRegistry();
     this.clipboard = new ClipboardHistory({ settings: this.settings, bus: this.bus });
+    this.mail = new MailService({ kv: platform.kv, accounts: this.accounts, settings: this.settings, bus: this.bus, notifications: this.notifications });
+    this.bus.on('accounts:changed', ({ id, op }) => { if (op === 'remove') this.mail.dropMailbox(id).catch(() => {}); });
     this.windowHost = null;          // set by the shell: (uid) => WindowManager
     this.booted = false;
     this.bootTime = null;
@@ -97,6 +101,8 @@ export class Kernel {
     this.kernelProcess = this.processes.spawnSystem({ id: 'kernel', name: 'DonutOS Kernel', icon: 'assets/brand/logo.svg' });
     this.#registerContextProviders();
     this.processes.start();
+    // Browser downloads are written by the host; announce them like any other new file.
+    this.platform.browser.onDownload((d) => { if (d.state === 'completed' && d.path) this.fs.noteExternalChange(d.path); });
     const flush = () => { this.settings.flush().catch(() => {}); };
     addEventListener('pagehide', flush);
     document.addEventListener('visibilitychange', () => { if (document.hidden) flush(); });
@@ -198,11 +204,12 @@ export class Kernel {
     if (s.type === 'dir') return this.launch('explorer', { path }, opts);
     const target = appId || this.associations.appForPath(path);
     if (!target) { this.bus.emit('kernel:openWith', { path }); return null; }
-    this.#rememberRecent(path, user);
+    this.rememberRecent(path, user);
     return this.launch(target, { path }, opts);
   }
 
-  #rememberRecent(path, uid = this.session.user?.id) {
+  /** Adds a file to the user's recent items (Start, Explorer Home, taskbar jump lists). */
+  rememberRecent(path, uid = this.session.user?.id) {
     if (!uid || !this.settings.isLoaded(uid)) return;
     const list = this.settings.get('start.recentFiles', uid).filter((r) => r.path !== path);
     this.settings.set('start.recentFiles', [{ path, time: Date.now() }, ...list].slice(0, 30), uid);
@@ -225,6 +232,8 @@ export class Kernel {
    */
   #routeNotifications() {
     this.bus.on('notification:activated', (n) => {
+      // Notifications posted by a shell service (alarms, reminders) are answered by that service.
+      if (n.data?.service) return;
       if (!this.registry.has(n.appId)) return;
       const procs = this.processes.byApp(n.appId).filter((p) => p.user === n.uid && p._notificationHandlers?.length);
       const payload = { id: n.id, actionId: n.actionId, data: n.data, title: n.title };
@@ -315,6 +324,56 @@ export class Kernel {
       current: () => k.sessions.get(proc.user)?.user || null,
       list: () => k.accounts.list(),
     }));
+
+    // Camera and microphone, behind their permissions. Streams stop when the app exits.
+    pm.provide('media', (proc, ctx) => Object.freeze({
+      getUserMedia: async (constraints = {}) => {
+        if (constraints.video) await need(proc, 'camera');
+        if (constraints.audio) await need(proc, 'microphone');
+        if (!navigator.mediaDevices?.getUserMedia) throw new ProcessError('ENODEV', 'This device has no camera or microphone access');
+        const stream = await navigator.mediaDevices.getUserMedia(constraints);
+        const kinds = stream.getTracks().map((t) => t.kind);
+        k.bus.emit('media:active', { pid: proc.pid, appId: proc.appId, name: proc.name, uid: proc.user, kinds });
+        const stop = () => {
+          stream.getTracks().forEach((t) => t.stop());
+          k.bus.emit('media:inactive', { pid: proc.pid, appId: proc.appId, uid: proc.user, kinds });
+        };
+        let stopped = false;
+        const once = () => { if (!stopped) { stopped = true; stop(); } };
+        stream.getTracks().forEach((t) => t.addEventListener('ended', () => { if (stream.getTracks().every((x) => x.readyState === 'ended')) once(); }));
+        ctx.own(once);
+        return Object.assign(stream, { release: once });
+      },
+      devices: async () => (await navigator.mediaDevices?.enumerateDevices?.() || []).map((d) => ({ kind: d.kind, label: d.label, deviceId: d.deviceId })),
+    }));
+
+    // Web pages for the Browser app. Opening pages needs the network permission.
+    pm.provide('browser', (proc, ctx) => {
+      const b = k.platform.browser;
+      return Object.freeze({
+        kind: b.kind,
+        createView: async ({ private: incognito = false } = {}) => {
+          await need(proc, 'network');
+          const v = b.createView({ partition: incognito ? 'donut-private' : 'persist:donut-browser' });
+          ctx.own(() => v.destroy());
+          return v;
+        },
+        online: () => k.permissions.status(proc.appId, 'network', proc.user) !== 'blocked' && navigator.onLine,
+        setDownloadDir: (path) => {
+          const home = k.homeFor(proc.user);
+          if (!P.isSameOrInside(home, P.normalize(path))) throw new ProcessError('EACCES', 'Downloads must go inside your user folder');
+          return b.setDownloadDir(P.normalize(path));
+        },
+        /** A view for the user's own files (HTML, SVG, PDF), isolated from DonutOS on both platforms. */
+        createFileView: ({ pdf = false } = {}) => { const v = createFrameView({ sandbox: pdf ? 'none' : 'strict' }); ctx.own(() => v.destroy()); return v; },
+        onDownload: (fn) => ctx.own(b.onDownload(proc.wrap(fn))),
+        cancelDownload: (id) => b.cancelDownload(id),
+        onOpenRequest: (fn) => ctx.own(b.onOpenRequest(proc.wrap(fn))),
+        clearData: (what) => b.clearData(what),
+      });
+    });
+
+    pm.provide('addRecent', (proc) => (path) => this.rememberRecent(path, proc.user));
 
     pm.provide('launch', (proc) => (appId, args) => k.launch(appId, args, { user: proc.user }));
     pm.provide('open', (proc) => (path, opts = {}) => k.open(path, { ...opts, user: proc.user }));
