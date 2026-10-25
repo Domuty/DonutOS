@@ -16,6 +16,28 @@ import { PERMISSIONS } from '../../core/permissions.js';
 import { HOME_FOLDERS } from '../../core/vfs.js';
 import * as P from '../../core/path.js';
 
+const THEMES = [
+  { name: 'Glaze', theme: 'dark', accent: '#e8618c', wallpaper: 'builtin:glaze', wallpaperFit: 'fill', transparency: true, font: 'system' },
+  { name: 'Sprinkles', theme: 'dark', accent: '#e6b422', wallpaper: 'builtin:sprinkles', wallpaperFit: 'fill', transparency: true, font: 'rounded' },
+  { name: 'Dawn', theme: 'dark', accent: '#f08a4b', wallpaper: 'builtin:dawn', wallpaperFit: 'fill', transparency: true, font: 'system' },
+  { name: 'Mint', theme: 'light', accent: '#4cb782', wallpaper: 'builtin:mint', wallpaperFit: 'fill', transparency: true, font: 'humanist' },
+  { name: 'Ocean', theme: 'dark', accent: '#2fa8c9', wallpaper: 'builtin:ocean', wallpaperFit: 'fill', transparency: true, font: 'system' },
+  { name: 'Aurora', theme: 'dark', accent: '#9466e8', wallpaper: 'builtin:aurora', wallpaperFit: 'fill', transparency: true, font: 'system' },
+  { name: 'Paper', theme: 'light', accent: '#5b7cf0', wallpaper: 'color:#e9e4dc', wallpaperFit: 'fill', transparency: false, font: 'serif' },
+  { name: 'Midnight', theme: 'dark', accent: '#8a8a8a', wallpaper: 'color:#1b1b2f', wallpaperFit: 'fill', transparency: false, font: 'mono' },
+];
+
+async function uninstallApp(k, s, a) {
+  if (!(await confirmDialog(`Uninstall ${a.name}?`, 'This app and its settings will be removed. Your files stay where they are.', { ok: 'Uninstall', danger: true }))) return false;
+  try {
+    for (const p of k.processes.byApp(a.id)) await k.processes.kill(p.pid, { force: true });
+    await k.registry.uninstall(a.id);
+    s.resetPrefix(`app.${a.id}.`);
+    for (const where of ['start.pinned', 'taskbar.pinned']) s.set(where, s.get(where).filter((x) => x !== a.id));
+    return true;
+  } catch (err) { alertDialog('Couldn’t uninstall', err.message); return false; }
+}
+
 const IMAGE_EXT = new Set(['.png', '.jpg', '.jpeg', '.webp', '.gif', '.bmp', '.avif', '.svg']);
 
 export function renderPage(id, el, env) {
@@ -26,7 +48,7 @@ export function renderPage(id, el, env) {
 const hub = (el, env, ids) => mount(el, ids.map((id) => link(ICONS[id] || 'chevronRight', PAGES[id].title, PAGES[id].description, () => env.go(id))));
 const ICONS = {
   multitasking: 'view', display: 'monitor', sound: 'volume', notifications: 'info', focus: 'sparkle', power: 'power', storage: 'folder', clipboard: 'clipboard', shortcuts: 'keypad', about: 'info',
-  background: 'image', colors: 'palette', lockscreen: 'lock', taskbar: 'apps', start: 'view', fonts: 'edit', desktop: 'monitor',
+  themes: 'sparkle', background: 'image', colors: 'palette', lockscreen: 'lock', taskbar: 'apps', start: 'view', fonts: 'edit', desktop: 'monitor',
 };
 
 const RENDER = {
@@ -185,7 +207,49 @@ const RENDER = {
     const preview = h('div.set-preview');
     resolveWallpaper(s.get('appearance.wallpaper'), k.fs, { thumb: true }).then((r) => { preview.style.background = r.url ? `center/cover url("${r.url}")` : r.color; });
     mount(el, preview, h('div.panel'));
-    hub(el.lastChild, env, ['background', 'colors', 'lockscreen', 'taskbar', 'start', 'fonts', 'desktop']);
+    hub(el.lastChild, env, ['themes', 'background', 'colors', 'lockscreen', 'taskbar', 'start', 'fonts', 'desktop']);
+  },
+
+  themes(el, { s, k }) {
+    const KEYS = ['theme', 'accent', 'wallpaper', 'wallpaperFit', 'transparency', 'font'];
+    const current = () => Object.fromEntries(KEYS.map((key) => [key, s.get(`appearance.${key}`)]));
+    const same = (t) => KEYS.every((key) => t[key] === undefined || t[key] === current()[key]);
+    const apply = (t) => {
+      s.setMany(Object.fromEntries(KEYS.filter((key) => t[key] !== undefined).map((key) => [`appearance.${key}`, t[key]])));
+      s.set('appearance.accentAuto', false);
+    };
+    const card = (t, { custom } = {}) => {
+      const thumb = h('div.theme-thumb', h('div.theme-win', { class: t.theme === 'light' ? 'light' : 'dark' }, h('i', { style: { background: t.accent } }), h('b'), h('b')));
+      resolveWallpaper(t.wallpaper, k.fs, { thumb: true }).then((r) => { thumb.style.background = r.url ? `center/cover url("${r.url}")` : r.color; });
+      const inUse = same(t);
+      return h('div.theme-card', { class: inUse && 'on' },
+        h('button.theme-pick', { type: 'button', 'aria-pressed': String(inUse), 'aria-label': `Use the ${t.name} theme`, onclick: () => apply(t) }, thumb,
+          h('span', h('b', t.name), h('small', inUse ? 'In use' : `${t.theme === 'light' ? 'Light' : t.theme === 'auto' ? 'Auto' : 'Dark'} mode`))),
+        custom ? h('button.tb-btn.theme-del', { type: 'button', 'aria-label': `Delete ${t.name}`, title: 'Delete', onclick: async () => {
+          if (!(await confirmDialog(`Delete “${t.name}”?`, 'The theme is removed. Your current look doesn’t change.', { ok: 'Delete', danger: true }))) return;
+          s.set('appearance.customThemes', s.get('appearance.customThemes').filter((x) => x.name !== t.name));
+          render();
+        } }, icon('trash', { size: 14 })) : null);
+    };
+    const render = () => {
+      const custom = s.get('appearance.customThemes');
+      mount(el,
+        h('p.hint', 'A theme sets your background, mode, accent colour, transparency and font in one go.'),
+        section('Built-in themes'),
+        h('div.theme-grid', THEMES.map((t) => card(t))),
+        section('Your themes'),
+        custom.length ? h('div.theme-grid', custom.map((t) => card(t, { custom: true }))) : h('p.hint', 'Themes you save appear here.'),
+        h('div.panel', row('plus', 'Save the current look as a theme', 'Keeps your background, colours and font so you can switch back later', h('button.btn', { type: 'button', onclick: async () => {
+          const name = await promptDialog('Save theme', { label: 'Theme name', value: `My theme ${custom.length + 1}`, ok: 'Save', validate: (v) => (!v.trim() ? 'Type a name' : v.trim().length > 40 ? 'Use 40 characters or fewer' : THEMES.some((t) => t.name.toLowerCase() === v.trim().toLowerCase()) ? 'A built-in theme already has that name' : '') });
+          if (!name) return;
+          const t = { name: name.trim(), ...current() };
+          s.set('appearance.customThemes', [...s.get('appearance.customThemes').filter((x) => x.name !== t.name), t].slice(-24));
+          render();
+        } }, 'Save theme'))));
+    };
+    render();
+    let queued = false;
+    return s.watch('appearance.*', () => { if (queued) return; queued = true; queueMicrotask(() => { queued = false; render(); }); });
   },
 
   background(el, { s, k, uid }) {
@@ -262,27 +326,69 @@ const RENDER = {
   },
 
   // ── Apps ─────────────────────────────────────────────────────────────
-  apps(el, { k, s }) {
+  apps(el, { k, s, go }) {
     const q = h('input.input', { type: 'search', placeholder: 'Search apps', 'aria-label': 'Search apps', style: { maxWidth: '320px' }, oninput: () => paint() });
     const list = h('div.panel');
     const paint = () => {
       const f = q.value.trim().toLowerCase();
       const apps = k.registry.list({ includeHidden: true }).filter((a) => !f || a.name.toLowerCase().includes(f));
       mount(list, apps.map((a) => row(h('img', { src: a.icon, alt: '', width: 28 }), a.name, `${a.builtin ? 'Built-in' : 'Installed'} · version ${a.version}${a.description ? ` · ${a.description}` : ''}`,
-        a.installed ? h('button.btn', { type: 'button', onclick: async () => {
-          if (!(await confirmDialog(`Uninstall ${a.name}?`, 'This app and its settings will be removed. Your files stay where they are.', { ok: 'Uninstall', danger: true }))) return;
-          try {
-            for (const p of k.processes.byApp(a.id)) await k.processes.kill(p.pid, { force: true });
-            await k.registry.uninstall(a.id);
-            s.resetPrefix(`app.${a.id}.`);
-            for (const where of ['start.pinned', 'taskbar.pinned']) s.set(where, s.get(where).filter((x) => x !== a.id));
-            paint();
-          } catch (err) { alertDialog('Couldn’t uninstall', err.message); }
-        } }, 'Uninstall') : null)));
+        h('button.btn', { type: 'button', onclick: () => go('appinfo', { args: { appId: a.id } }) }, 'Advanced options'),
+        a.installed ? h('button.btn', { type: 'button', onclick: async () => { if (await uninstallApp(k, s, a)) paint(); } }, 'Uninstall') : null)));
     };
     mount(el, q, list);
     paint();
     return k.bus.on('apps:*', paint);
+  },
+
+  appinfo(el, { k, s, uid, args, go }) {
+    const a = k.registry.get(args.appId);
+    if (!a) { go('apps', { push: false }); return null; }
+    const running = () => k.processes.byApp(a.id).filter((p) => p.user === uid);
+    const dataSize = () => s.keys(`app.${a.id}.`).reduce((n, key) => n + JSON.stringify(s.get(key) ?? null).length, 0);
+    const handles = k.associations.table().filter((r) => r.handlers.includes(a.id));
+    const permText = { granted: 'Allowed', denied: 'Denied', prompt: 'Asks first', blocked: 'Turned off for all apps', undeclared: '—' };
+    const render = () => {
+      const procs = running();
+      const perms = k.permissions.listForApp(a.id, uid);
+      const startup = new Set(s.get('apps.startup'));
+      mount(el,
+        h('div.set-hero', h('img', { src: a.icon, alt: '', width: 56, height: 56 }),
+          h('div', h('b', { style: { fontSize: '18px' } }, a.name), h('div.hint', `Version ${a.version} · ${a.builtin ? 'DonutOS' : a.author || 'Installed app'}${a.category ? ` · ${a.category}` : ''}`), a.description ? h('div.hint', a.description) : null)),
+        section('App permissions'),
+        a.system && perms.length ? h('p.hint', 'Built-in system apps always have the permissions they declare. The switches in Privacy & security still turn camera, microphone, location and notifications off for every app.') : null,
+        h('div.panel', perms.length ? perms.map((p) => row(null, p.label, p.description,
+          a.system ? h('span.hint', permText[p.state]) : h('select.input', { style: { width: '150px' }, 'aria-label': `${p.label} for ${a.name}`, onchange: (e) => {
+            if (e.target.value === 'prompt') k.permissions.reset(a.id, p.permission, uid); else if (e.target.value === 'granted') k.permissions.grant(a.id, p.permission, uid); else k.permissions.deny(a.id, p.permission, uid);
+          } }, [['prompt', 'Ask'], ['granted', 'Allow'], ['denied', 'Deny']].map(([v, l]) => h('option', { value: v, selected: p.state === v || (v === 'prompt' && p.state === 'blocked') }, l)))))
+          : row('shield', 'This app doesn’t use any permissions', null)),
+        section('Runs at sign-in'),
+        h('div.panel', row('rocket', 'Start when I sign in', null, h('label.toggle', h('small.toggle-state', startup.has(a.id) ? 'On' : 'Off'),
+          h('input', { type: 'checkbox', checked: startup.has(a.id), 'aria-label': `Start ${a.name} when I sign in`, onchange: (e) => {
+            const cur = new Set(s.get('apps.startup')); if (e.target.checked) cur.add(a.id); else cur.delete(a.id); s.set('apps.startup', [...cur]); render();
+          } }), h('span')))),
+        handles.length ? [section('Opens these file types'), h('div.panel', handles.map((r) => row('file', r.ext, r.appId === a.id ? 'Default app' : `Default is ${k.registry.get(r.appId)?.name}`,
+          r.appId === a.id ? null : h('button.btn', { type: 'button', onclick: () => { k.associations.setDefault(r.ext, a.id); render(); } }, 'Make default'))))] : null,
+        section('Terminate'),
+        h('div.panel', row('close', procs.length ? `${a.name} is running (${procs.length} ${procs.length === 1 ? 'process' : 'processes'})` : `${a.name} isn’t running`, 'Ends the app and everything it’s doing right now. Unsaved work is lost.',
+          h('button.btn', { type: 'button', disabled: !procs.length, onclick: async () => {
+            for (const p of running()) await k.processes.kill(p.pid, { force: true }).catch(() => {});
+            render();
+          } }, 'Terminate'))),
+        section('Reset'),
+        h('div.panel', row('refresh', 'Reset this app', `Erases the app’s saved data and preferences (${formatBytes(dataSize())}) and its permission choices. Your files stay where they are.`,
+          h('button.btn', { type: 'button', onclick: async () => {
+            if (!(await confirmDialog(`Reset ${a.name}?`, 'Its preferences and saved data are erased and it starts fresh. Files in your folders aren’t touched.', { ok: 'Reset', danger: true }))) return;
+            for (const p of running()) await k.processes.kill(p.pid, { force: true }).catch(() => {});
+            s.resetPrefix(`app.${a.id}.`);
+            k.permissions.reset(a.id, null, uid);
+            render();
+          } }, 'Reset'))),
+        a.installed ? [section('Uninstall'), h('div.panel', row('trash', `Uninstall ${a.name}`, 'Removes the app and its settings.', h('button.btn', { type: 'button', onclick: async () => { if (await uninstallApp(k, s, a)) go('apps', { push: false }); } }, 'Uninstall')))] : null);
+    };
+    render();
+    const offs = [k.bus.on('process:*', (e, type) => { if ((type === 'process:exit' || type === 'process:running') && e.appId === a.id) render(); }), k.bus.on('permissions:changed', (e) => { if (e.appId === a.id) render(); })];
+    return () => offs.forEach((f) => f());
   },
 
   defaultapps(el, { k }) {

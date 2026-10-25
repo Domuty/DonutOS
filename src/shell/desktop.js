@@ -14,11 +14,11 @@ import {
 } from './file-ops.js';
 import { confirmDialog } from '../ui/dialog.js';
 import { debounce } from '../core/util.js';
+import { canThumb, thumbnail } from './thumbs.js';
 import * as P from '../core/path.js';
 
 const SIZES = { small: { w: 76, h: 74, icon: 32 }, medium: { w: 88, h: 96, icon: 48 }, large: { w: 108, h: 120, icon: 72 } };
 const BIN = '::recyclebin';
-const THUMB_EXT = new Set(['.png', '.jpg', '.jpeg', '.webp', '.gif', '.bmp', '.avif']);
 
 export class Desktop {
   constructor(session) {
@@ -113,7 +113,7 @@ export class Desktop {
       const p = this.positions.get(it.key);
       const sel = this.selected.has(it.key);
       const btn = h('div.dicon', {
-        role: 'option', tabindex: '-1', 'aria-selected': String(sel), draggable: 'true', title: it.type === 'bin' ? 'Recycle Bin' : it.name,
+        role: 'option', 'aria-selected': String(sel), draggable: 'true', title: it.type === 'bin' ? 'Recycle Bin' : it.name,
         class: [sel && 'selected', cut.has(it.key) && 'cut'], dataset: { key: it.key },
         style: { left: `${p.c * cell.w + 4}px`, top: `${p.r * cell.h + 4}px`, width: `${cell.w}px`, height: `${cell.h}px` },
       }, h('img', { src: this.iconFor(it), alt: '', draggable: 'false' }), h('span.dlabel', it.name));
@@ -130,21 +130,15 @@ export class Desktop {
   /** Small previews for images on the desktop, like a desktop OS shows. */
   async loadThumbs() {
     for (const it of this.items) {
-      if (it.type !== 'file' || !THUMB_EXT.has(it.ext) || it.size > 8 * 1024 * 1024) continue;
+      if (!it.path || !canThumb(it)) continue;
       const key = `${it.path}|${it.mtime}`;
       if (this.thumbs.has(key)) continue;
       this.thumbs.set(key, iconForEntry(it));
-      try {
-        const blob = await this.kernel.fs.readBlob(it.path);
-        const bmp = await createImageBitmap(blob);
-        const c = document.createElement('canvas');
-        const s = 96 / Math.max(bmp.width, bmp.height);
-        c.width = Math.max(1, Math.round(bmp.width * s)); c.height = Math.max(1, Math.round(bmp.height * s));
-        c.getContext('2d').drawImage(bmp, 0, 0, c.width, c.height);
-        this.thumbs.set(key, c.toDataURL('image/png'));
-        const img = this.el.querySelector(`[data-key="${CSS.escape(it.key)}"] img`);
-        if (img) { img.src = this.thumbs.get(key); img.classList.add('thumb'); }
-      } catch { /* not decodable: keep the file-type icon */ }
+      const url = await thumbnail(this.kernel.fs, it);
+      if (!url) continue;
+      this.thumbs.set(key, url);
+      const img = this.el.querySelector(`[data-key="${CSS.escape(it.key)}"] img`);
+      if (img) { img.src = url; img.classList.add('thumb'); }
     }
   }
 

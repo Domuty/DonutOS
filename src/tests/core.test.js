@@ -11,6 +11,7 @@ import { SettingsStore } from '../core/settings.js';
 import { validateManifest } from '../core/registry.js';
 import * as P from '../core/path.js';
 import { sleep } from '../core/util.js';
+import { tokenize, parse, Shell, getopts, ShellSyntaxError } from '../apps/terminal/shell.js';
 
 globalThis.DONUT_NO_SW = true;
 const platform = createPlatform({ dbName: 'donutos-tests' });
@@ -880,6 +881,64 @@ test('closing an app\'s last window ends the app', async () => {
     await sleep(20);
     assert.equal(kernel.processes.get(p.pid), null);
   } finally { await f.cleanup(); }
+});
+
+test('terminal: tokenizer handles quotes, escapes, operators and comments', () => {
+  const words = (line) => tokenize(line).map((t) => (t.t === 'op' ? `<${t.v}>` : t.parts.map((p) => p.text).join('')));
+  assert.deepEqual(words(`echo "a b" 'c d' e\\ f`), ['echo', 'a b', 'c d', 'e f']);
+  assert.deepEqual(words('a|b&&c||d;e>f>>g<h 2>i'), ['a', '<|>', 'b', '<&&>', 'c', '<||>', 'd', '<;>', 'e', '<>>', 'f', '<>>>', 'g', '<<>', 'h', '<2>>', 'i']);
+  assert.deepEqual(words('ls # a comment'), ['ls']);
+  let threw = false;
+  try { tokenize('echo "open'); } catch (e) { threw = e instanceof ShellSyntaxError; }
+  assert.ok(threw, 'unclosed quote is a syntax error');
+  const list = parse(tokenize('a x | b > out && c'));
+  assert.equal(list.length, 2);
+  assert.equal(list[0].pipeline.length, 2);
+  assert.equal(list[0].pipeline[1].redirects[0].op, '>');
+  assert.equal(list[1].op, '&&');
+});
+
+test('terminal: getopts reads short, grouped, valued and long flags', () => {
+  const r = getopts(['-la', '-n', '5', '--name=x', 'file', '--', '-z'], { bool: 'la', str: 'n' });
+  assert.deepEqual(r.flags, { l: true, a: true, n: '5', name: 'x' });
+  assert.deepEqual(r.args, ['file', '-z']);
+});
+
+test('terminal: shell runs pipes, redirects, variables, globs and && / ||', async () => {
+  const dir = `${T}/term`;
+  await kernel.fs.mkdir(dir, { recursive: true });
+  const commands = {
+    echo: (args, io) => { io.out(`${args.join(' ')}\n`); return 0; },
+    cat: async (args, io, sh) => { io.out(args.length ? (await Promise.all(args.map((a) => sh.fs.readText(sh.resolve(a))))).join('') : io.stdin ?? ''); return 0; },
+    upper: (args, io) => { io.out((io.stdin || '').toUpperCase()); return 0; },
+    false: () => 1,
+  };
+  const sh = new Shell({ fs: kernel.fs, home: dir, commands });
+  let out = '';
+  let err = '';
+  const io = { out: (t) => { out += t; }, err: (t) => { err += t; } };
+  await sh.run('echo hello > a.txt; echo world >> a.txt', io);
+  assert.equal(await kernel.fs.readText(`${dir}/a.txt`), 'hello\nworld\n');
+  await sh.run('cat a.txt | upper', io);
+  assert.equal(out, 'HELLO\nWORLD\n');
+  out = '';
+  await sh.run("N=7; echo \"n=$N\" '$N' ~", io);
+  assert.equal(out, `n=7 $N ${dir}\n`);
+  out = '';
+  await kernel.fs.writeText(`${dir}/b.txt`, 'x');
+  await sh.run('echo *.txt', io);
+  assert.equal(out, 'a.txt b.txt\n');
+  out = '';
+  await sh.run('false && echo no || echo yes', io);
+  assert.equal(out, 'yes\n');
+  out = '';
+  assert.equal(await sh.run('missing', io), 127);
+  assert.ok(/command not found/.test(err));
+  await sh.run('echo $?', io);
+  assert.equal(out, '127\n');
+  out = '';
+  await sh.run('upper < a.txt', io);
+  assert.equal(out, 'HELLO\nWORLD\n');
 });
 
 test('signing out ends the user\'s apps', async () => {

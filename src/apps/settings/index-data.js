@@ -25,6 +25,7 @@ export const PAGES = {
   shortcuts: { section: 'system', title: 'Keyboard shortcuts', description: 'Every DonutOS shortcut and its alternatives' },
   about: { section: 'system', title: 'About', description: 'Device specifications, rename this device' },
   personalization: { section: 'personalization', title: 'Personalization', description: 'Background, colours, themes' },
+  themes: { section: 'personalization', title: 'Themes', description: 'Wallpaper, colour and mode together; save your own' },
   background: { section: 'personalization', title: 'Background', description: 'Wallpaper, solid colour, picture fit' },
   colors: { section: 'personalization', title: 'Colours', description: 'Mode, accent colour, transparency' },
   lockscreen: { section: 'personalization', title: 'Lock screen', description: 'Lock screen picture, status' },
@@ -33,6 +34,7 @@ export const PAGES = {
   fonts: { section: 'personalization', title: 'Fonts & text', description: 'Font family and text size' },
   desktop: { section: 'personalization', title: 'Desktop icons', description: 'Icon size, arrangement' },
   apps: { section: 'apps', title: 'Installed apps', description: 'Uninstall, app details' },
+  appinfo: { section: 'apps', title: 'App details', description: 'Permissions, storage, reset, terminate', hidden: true },
   defaultapps: { section: 'apps', title: 'Default apps', description: 'Defaults for file types' },
   startup: { section: 'apps', title: 'Startup', description: 'Apps that start when you sign in' },
   accounts: { section: 'accounts', title: 'Your info', description: 'Your picture, name, sign-in options, other people' },
@@ -53,6 +55,7 @@ const ENTRIES = [
   ['Storage usage', 'storage', 'disk space free'], ['Snap windows', 'multitasking', 'snap layouts assist arrange side by side'],
   ['Title bar window shake', 'multitasking', 'aero shake minimize'], ['Virtual desktops', 'multitasking', 'task view workspaces'], ['Alt+Tab', 'multitasking', 'switch windows'], ['Clipboard history', 'clipboard', 'copy paste'],
   ['Rename this device', 'about', 'device name pc name computer'], ['Device specifications', 'about', 'processor ram memory version about'],
+  ['Themes', 'themes', 'theme preset custom save look'], ['App permissions and storage', 'apps', 'advanced options reset terminate app details'],
   ['Wallpaper', 'background', 'background picture desktop image'], ['Solid colour background', 'background', 'color'],
   ['Dark mode', 'colors', 'light theme mode night'], ['Accent colour', 'colors', 'color highlight'], ['Transparency effects', 'colors', 'mica acrylic blur'],
   ['Animation effects', 'colors', 'motion'], ['Lock screen picture', 'lockscreen', 'wallpaper'],
@@ -71,6 +74,6 @@ const ENTRIES = [
 ];
 
 export const SETTINGS_INDEX = [
-  ...Object.entries(PAGES).map(([page, p]) => ({ title: p.title, page, keywords: p.description.toLowerCase(), section: p.section })),
+  ...Object.entries(PAGES).filter(([, p]) => !p.hidden).map(([page, p]) => ({ title: p.title, page, keywords: p.description.toLowerCase(), section: p.section })),
   ...ENTRIES.map(([title, page, kw]) => ({ title, page, keywords: kw, section: PAGES[page].section })),
 ];

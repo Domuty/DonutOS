@@ -143,6 +143,7 @@ export class SettingsStore {
       setMany: (vals) => this.setMany(vals, uid),
       reset: (k) => this.reset(k, uid),
       keys: (p) => this.keys(p, uid),
+      resetPrefix: (p) => { for (const key of this.keys(p, uid)) this.reset(key, uid); },
       watch: (p, fn, o = {}) => this.watch(p, fn, { ...o, uid }),
     });
   }

@@ -27,6 +27,22 @@ export class WindowManager {
     this.offExit = kernel.bus.on('process:exit', ({ pid }) => this.#closeForPid(pid));
     this.onResize = () => this.fitToScreen();
     window.addEventListener('resize', this.onResize);
+    // When nothing has focus (e.g. the focused button was re-rendered), keys go to the
+    // active window — like a desktop OS, where the keyboard always belongs to a window.
+    this.onKeyNowhere = (e) => {
+      const a = document.activeElement;
+      if (a && a !== document.body) return;
+      // Only keys that really started nowhere: an event from an element that was removed while
+      // handling it (e.g. a closed tab) has already been handled.
+      if (e.defaultPrevented || (e.target !== document.body && e.target !== document.documentElement)) return;
+      const win = this.active;
+      if (!win || win.state === 'minimized' || !this.layer.isConnected || this.layer.closest('[hidden], [inert]')) return;
+      win.body.focus({ preventScroll: true });
+      const copy = new KeyboardEvent(e.type, e);
+      const handled = !win.body.dispatchEvent(copy);
+      if (handled) e.preventDefault();
+    };
+    document.addEventListener('keydown', this.onKeyNowhere);
   }
 
   /** Subscribe to any change (open, close, focus, title, state). */
@@ -106,7 +122,7 @@ export class WindowManager {
     }
     this.order = this.order.filter((w) => w !== win).concat(win);
     win.el.style.zIndex = String(++this.z);
-    if (!win.el.contains(document.activeElement)) (win.lastFocus?.isConnected ? win.lastFocus : win.el).focus({ preventScroll: true });
+    if (!win.el.contains(document.activeElement)) (win.lastFocus?.isConnected && win.el.contains(win.lastFocus) ? win.lastFocus : win.body).focus({ preventScroll: true });
     this.kernel.bus.emit('wm:focus', { uid: this.uid, id: win.id, appId: win.appId });
     this.changed(win);
   }
@@ -254,6 +270,7 @@ export class WindowManager {
   destroy() {
     this.offExit();
     window.removeEventListener('resize', this.onResize);
+    document.removeEventListener('keydown', this.onKeyNowhere);
     for (const w of [...this.windows.values()]) w.el.remove();
     this.windows.clear();
   }

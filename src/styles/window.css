@@ -37,7 +37,7 @@
 .win-close:hover { background: #c42b1c; color: #fff; }
 .win-close:active { background: #b52a1c; color: #fff; }
 .win:not(.active) .win-btn { color: var(--text-3); }
-.win-body { flex: 1; min-height: 0; position: relative; overflow: hidden; display: flex; flex-direction: column; }
+.win-body { outline: none; flex: 1; min-height: 0; position: relative; overflow: hidden; display: flex; flex-direction: column; }
 
 .rz { position: absolute; z-index: 5; }
 .rz-n, .rz-s { left: 8px; right: 8px; height: 6px; cursor: ns-resize; }

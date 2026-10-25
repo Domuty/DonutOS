@@ -13,6 +13,7 @@ export default function main(ctx) {
   const s = k.settings.forUser(uid);
   const win = ctx.windows.create({ title: 'Settings' });
   let page = PAGES[ctx.args.page] ? ctx.args.page : 'system';
+  let pageArgs = { appId: ctx.args.appId };
   let stopPage = null;
   const history = [];
 
@@ -25,10 +26,12 @@ export default function main(ctx) {
   const search = h('input.input', { type: 'search', placeholder: 'Find a setting', 'aria-label': 'Find a setting',
     oninput: () => renderNav(), onkeydown: (e) => { if (e.key === 'Enter') nav.querySelector('.set-hit')?.click(); } });
 
-  function go(id, { push = true } = {}) {
+  function go(id, { push = true, args } = {}) {
     if (!PAGES[id]) return;
+    if (id === 'appinfo' && !k.registry.get(args?.appId ?? pageArgs.appId)) id = 'apps';
     if (push && id !== page) history.push(page);
     page = id;
+    if (args) pageArgs = args;
     renderNav();
     renderContent();
   }
@@ -52,16 +55,17 @@ export default function main(ctx) {
     const crumbs = h('h1.set-title',
       history.length ? h('button.tb-btn', { type: 'button', 'aria-label': 'Back', onclick: () => go(history.pop(), { push: false }) }, icon('arrowLeft', { size: 16 })) : null,
       p.title !== sec.title && page !== sec.id ? [h('button.set-crumb', { type: 'button', onclick: () => go(SECTION_HOME[sec.id] || sec.id) }, sec.title), h('span.set-crumb-sep', '›')] : null,
-      h('span', p.title));
+      h('span', page === 'appinfo' ? k.registry.get(pageArgs.appId)?.name || p.title : p.title));
     const body = h('div.set-page');
     mount(content, crumbs, body);
     content.scrollTop = 0;
     win.setTitle(`Settings — ${p.title}`);
-    stopPage = renderPage(page, body, { ctx, k, s, uid, go, win }) || null;
+    stopPage = renderPage(page, body, { ctx, k, s, uid, go, win, args: pageArgs }) || null;
   }
 
-  ctx.onActivate((args) => { win.focus(); if (args?.page) go(args.page); });
+  ctx.onActivate((args) => { win.focus(); if (args?.page) go(args.page, { args: { appId: args.appId } }); });
   ctx.onExit(() => stopPage?.());
+  if (page === 'appinfo' && !k.registry.get(pageArgs.appId)) page = 'apps';
   renderNav();
   renderContent();
 }

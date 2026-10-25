@@ -11,6 +11,8 @@ export function closeMenu() { open?.(); }
 
 export function showMenu(items, { x, y, anchor, placement = 'below', parent = document.body } = {}) {
   closeMenu();
+  const previousFocus = document.activeElement;
+  const previousWindow = previousFocus?.closest?.('.win');
   const menu = h('div.menu', { role: 'menu' }, items.map((it) => it.separator ? h('hr') : it.header ? h('div.menu-header', it.header) : h('button', {
     role: 'menuitem', type: 'button', disabled: !!it.disabled, class: it.danger && 'danger',
     onclick: () => { close(); it.onSelect?.(); },
@@ -44,7 +46,13 @@ export function showMenu(items, { x, y, anchor, placement = 'below', parent = do
   document.addEventListener('keydown', onKey, true);
   window.addEventListener('blur', closeMenuSoon);
   function close() {
+    const hadFocus = menu.contains(document.activeElement);
     menu.remove();
+    // Give focus back to where it was (the app window), as a desktop OS does.
+    if (hadFocus) {
+      if (previousFocus?.isConnected) previousFocus.focus({ preventScroll: true });
+      else previousWindow?.querySelector('.win-body')?.focus({ preventScroll: true });
+    }
     document.removeEventListener('pointerdown', onDown, true);
     document.removeEventListener('keydown', onKey, true);
     window.removeEventListener('blur', closeMenuSoon);

@@ -40,6 +40,7 @@ export class Process {
     this.memory = BASE_MEMORY;
     this.trackedBytes = 0;
     this.status = 'Running';      // human-readable (Running | Not responding | Suspended)
+    this.launchMs = null;         // time from spawn until main(ctx) finished
     this._disposers = [];
     this._exitHandlers = [];
     this._activateHandlers = [];
@@ -73,6 +74,7 @@ export class Process {
       pid: this.pid, appId: this.appId, name: this.name, icon: this.icon, parentPid: this.parentPid,
       critical: this.critical, user: this.user, startTime: this.startTime, state: this.state,
       status: this.status, cpu: this.cpu, memory: this.memory, windows: this.windows.size,
+      cpuTime: this.cpuTime, launchMs: this.launchMs,
     };
   }
 }
@@ -145,6 +147,7 @@ export class ProcessManager {
 
   async #launch(proc) {
     const app = proc.app;
+    const t0 = performance.now();
     this.#bus.emit('process:start', proc.info());
     try {
       const mod = app.module || (await import(new URL(app.entry, document.baseURI).href));
@@ -156,6 +159,7 @@ export class ProcessManager {
       // Time spent awaiting inside an async main is idle, so only its sync slices were charged.
       if (result && typeof result.then === 'function') await result;
       if (proc.state === 'starting') {
+        proc.launchMs = Math.round(performance.now() - t0);
         proc.state = 'running';
         this.#bus.emit('process:running', proc.info());
       }

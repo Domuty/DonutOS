@@ -29,6 +29,7 @@ export const SCHEMA = {
   'appearance.wallpaperSlideshow': { scope: 'user', type: 'object', default: { enabled: false, folder: '', intervalMin: 30 } },
   'appearance.font':          { scope: 'user', type: 'string', default: 'system', enum: ['system', 'rounded', 'serif', 'mono', 'humanist'] },
   'appearance.textScale':     { scope: 'user', type: 'number', default: 100, min: 100, max: 225 },
+  'appearance.customThemes':  { scope: 'user', type: 'array', default: [] },
   'appearance.lockWallpaper': { scope: 'user', type: 'string', default: 'builtin:glaze' },
 
   // ── Taskbar / Start ──────────────────────────────────────────────────

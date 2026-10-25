@@ -6,6 +6,7 @@ import { h, settle } from './h.js';
 export function dialog({ title, body, buttons = [{ label: 'OK', value: true, primary: true }], width, cancelValue = null, onOpen, parent = document.body, dismissible = true } = {}) {
   return new Promise((resolve) => {
     const previouslyFocused = document.activeElement;
+    const previousWindow = previouslyFocused?.closest?.('.win');
     let closed = false;
     const close = async (value) => {
       if (closed) return;
@@ -20,7 +21,8 @@ export function dialog({ title, body, buttons = [{ label: 'OK', value: true, pri
       backdrop.classList.add('closing'); box.classList.add('closing');
       await settle(box, 200);
       backdrop.remove();
-      previouslyFocused?.focus?.();
+      if (previouslyFocused?.isConnected) previouslyFocused.focus?.({ preventScroll: true });
+      else previousWindow?.querySelector('.win-body')?.focus({ preventScroll: true });
       resolve(value);
     };
     const box = h('div.dlg', { role: 'dialog', 'aria-modal': 'true', 'aria-label': title || 'Dialog', style: width ? { '--w': `${width}px` } : null },

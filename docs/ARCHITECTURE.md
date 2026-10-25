@@ -48,7 +48,7 @@ Everything above it talks to the adapter interface (`src/platform/adapter.js`), 
 
 ## Folder tree
 
-Files marked ✅ exist now (phases 1–3). The rest are created in the phase shown.
+Files marked ✅ exist now (phases 1–5). The rest are created in the phase shown.
 
 ```
 donutos/
@@ -144,11 +144,14 @@ donutos/
     │   ├── window-manager.js, window.js  ✅ windows, focus, z-order, previews, remembered bounds
     │   ├── snap.js                       ✅ edge/corner snapping, layouts, Snap Assist, groups, shake, Win+Arrow
     │   ├── virtual-desktops.js, task-view.js, alt-tab.js  ✅
+    ├── lib/zip.js               ✅ zip/unzip over the DonutOS file API (vendored JSZip, zip-slip safe)
     ├── ui/                      ✅ h.js (DOM helper), icons.js, avatar.js, dialog.js, menu.js
     ├── apps/
     │   ├── index.js             ✅ built-in manifest list (filled as apps arrive)
     │   ├── settings/ recyclebin/ snipping/ console/                           ✅
-    │   ├── explorer/ terminal/ taskmanager/                                   5
+    │   ├── explorer/            ✅ main.js (tabs, nav, address bar, search), view.js (5 views), actions.js (zip, import/export)
+    │   ├── terminal/            ✅ shell.js (parser/interpreter), commands.js, js-worker.js, main.js
+    │   ├── taskmanager/         ✅ main.js (processes, performance, startup, users, details), graph.js
     │   ├── notepad/ writer/ calculator/ paint/ photos/ mediaplayer/           6
     │   ├── camera/ recorder/ clock/ calendar/ stickynotes/ browser/ mail/     6
     │   ├── solitaire/ minesweeper/                                            6
@@ -312,6 +315,29 @@ focus is a timed do-not-disturb.
 - **Full-screen keys**: in full screen, Chromium's Keyboard Lock gives DonutOS the Win key,
   Alt+Tab and similar system shortcuts (desktop build: always when launched full screen; web: after
   turning on Full screen in Settings › Display). Holding Esc for two seconds hands them back.
+
+## Built-in system apps (phase 5)
+
+- **File Explorer** works only through the file API, so the same code browses IndexedDB on the
+  web and the real `Documents/DonutOS` folder on the desktop. Users can open their own home and
+  `Public`; administrators can open everything. Zip/unzip uses JSZip (`src/vendor`), and
+  extraction refuses entries that would land outside the target folder. Export/Import use the
+  host's file picker and downloads (web) or save dialog (desktop).
+- **Terminal**: `apps/terminal/shell.js` is a small POSIX-like interpreter (quotes, `$VARS`, `~`,
+  globs, pipes, redirects, `&& || ;`); every command in `commands.js` uses the permission-checked
+  `ctx.fs`. `.dsh` files are shell scripts (`sh file.dsh args`). `js` runs JavaScript in a Web
+  Worker with storage, network and nested workers removed; it reaches DonutOS only through the
+  `donut` RPC object, so it obeys the same permissions. Ctrl+C terminates the worker, which stops
+  even an endless loop.
+- **Task Manager** reads `kernel.processes` (CPU = time spent in each app's callbacks; memory =
+  base + DOM + reported bytes) and the adapter's `system.stats()` (estimated on the web, real OS
+  numbers on the desktop, including per-core CPU). Disk activity is DonutOS file operations per
+  second; network is what DonutOS downloaded over http(s) (Resource Timing) while it's open.
+  Critical processes can't be ended; other users' apps need an administrator. Signing a user out
+  goes through `shell:signOutRequest`, so their screen is torn down by the shell.
+- **Settings**: Personalization › Themes (8 presets + saved custom themes in
+  `appearance.customThemes`); Apps › Installed apps › Advanced options (`appinfo` page:
+  permissions, startup, file types, terminate, reset data and permission choices, uninstall).
 
 ## Security notes (desktop)
 

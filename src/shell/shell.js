@@ -49,6 +49,12 @@ export class Shell {
     installPermissionPrompt(this.kernel);
     watchTheme(this.kernel.settings);
     this.kernel.bus.on('session:changed', () => applyTheme(this.kernel.settings));
+    // Requests from system apps (Task Manager) for things only the shell can do.
+    this.kernel.bus.on('shell:signOutRequest', ({ uid }) => {
+      if (uid === this.kernel.session.user?.id) this.power.signOut();
+      else if (this.kernel.sessions.has(uid)) this.endSession(uid);
+    });
+    this.kernel.bus.on('shell:runDialog', () => { if (this.inSession()) runDialog(this.kernel, this.view); });
     this.filters = new DisplayFilters(this.kernel, this.root);
     this.#installShortcuts();
     this.#installAutoLock();
