@@ -48,7 +48,7 @@ Everything above it talks to the adapter interface (`src/platform/adapter.js`), 
 
 ## Folder tree
 
-Files marked ✅ exist now (phases 1–7). The rest are created in the phase shown.
+Files marked ✅ exist now (phases 1–8). The rest are created in the phase shown.
 
 ```
 donutos/
@@ -105,7 +105,8 @@ donutos/
     │   ├── window.css           ✅ windows (Mica, title bars, resize handles)
     │   ├── taskbar.css          ✅ taskbar, Start, Search, Quick Settings, notifications, widgets, emoji
     │   ├── desktop.css          ✅ desktop icons
-    │   └── apps.css             ✅ built-in apps
+    │   ├── apps.css             ✅ built-in apps
+    │   └── a11y.css             ✅ contrast themes, focus indicator, Magnifier, Narrator, on-screen keyboard…
     ├── platform/
     │   ├── adapter.js           ✅ THE interface + assertAdapter()
     │   ├── index.js             ✅ picks the adapter (the only platform check in /src)
@@ -149,14 +150,15 @@ donutos/
     │   ├── snap.js                       ✅ edge/corner snapping, layouts, Snap Assist, groups, shake, Win+Arrow
     │   ├── virtual-desktops.js, task-view.js, alt-tab.js  ✅
     ├── lib/zip.js               ✅ zip/unzip over the DonutOS file API (vendored JSZip, zip-slip safe)
-    ├── ui/                      ✅ h.js (DOM helper), icons.js, avatar.js, dialog.js, menu.js, menubar.js, file-dialog.js
+    ├── ui/                      ✅ h.js (DOM helper), icons.js, avatar.js, dialog.js, menu.js, menubar.js, file-dialog.js,
+    │                               a11y-name.js (names/roles for Narrator), roving.js (arrow-key groups), screen.js (Magnifier coordinates), contrast.js (WCAG)
     ├── apps/
     │   ├── index.js             ✅ built-in manifest list (filled as apps arrive)
     │   ├── settings/ recyclebin/ snipping/ console/                           ✅
     │   ├── explorer/            ✅ main.js (tabs, nav, address bar, search), view.js (5 views), actions.js (zip, import/export)
     │   ├── terminal/            ✅ shell.js (parser/interpreter), commands.js, js-worker.js, main.js
     │   ├── taskmanager/         ✅ main.js (processes, performance, startup, users, details), graph.js
-    │   ├── common/              ✅ document.js (open/save/unsaved changes), print.js
+    │   ├── common/              ✅ document.js (open/save/unsaved changes), print.js, tabs.js (accessible tab strips)
     │   ├── notepad/ writer/ calculator/ paint/ photos/ mediaplayer/           ✅
     │   ├── camera/ recorder/ clock/ calendar/ stickynotes/ browser/ mail/     ✅
     │   ├── solitaire/ minesweeper/                                            ✅
@@ -421,6 +423,28 @@ focus is a timed do-not-disturb.
   - Uninstall (`shell/apps.js › uninstallApp`) ends the app, unregisters it, and clears its `app.<id>.*` settings, permission grants and pins.
 - **Developer tools.** Terminal `dapp new|pack|install|list|uninstall`, `scripts/pack-dapp.js`,
   and `npm start -- --devtools`. The full guide is [SDK.md](SDK.md).
+
+## Accessibility and performance (phase 8)
+
+- **`shell/a11y/`** (one `Accessibility` manager, created before shortcuts attach so key aids see keys first):
+  - `prefs.js` — the user's `a11y.*` settings, or the device-wide `a11y.signin` set on the lock, sign-in and setup screens. Setup copies its choices into the new account.
+  - `contrast.js` — four contrast themes mapped onto the design tokens (applied by `theme.js`, which also sets `data-focus-ring` and `data-scrollbars`).
+  - `magnifier.js` — scales `<body>` around the pointer: the page point under the pointer stays put, so pointer positions need no conversion. Popups use `ui/screen.js` to place themselves inside the visible part. It follows keyboard focus, and anything that gets focus off-screen.
+  - `narrator.js` — a screen reader on Web Speech: focus (with window/dialog context), typing echo, state changes, live regions, reading under the pointer, captions, and Narrator-key commands. Names and roles come from `ui/a11y-name.js`.
+  - `keyboard.js` — Sticky Keys (adds modifiers to the real event via property shadowing, then performs editing the browser wouldn't), Bounce Keys and Toggle Keys. `edit-actions.js` has the shared editing actions.
+  - `osk.js` — the on-screen keyboard. It sends key events plus edits; Store app frames get keys through the sandbox bridge, and desktop Browser pages get real input (`browser:sendKey` → `webContents.sendInputEvent`).
+  - `cursors.js` — bigger and recoloured pointers, as `--cur-*` variables used by every `cursor:` in the CSS.
+  - `color-filters.js` — grayscale, inverted, and daltonising SVG colour matrices.
+- **Store apps** get the same features through the sandbox: theme snapshot (contrast, pointer, focus ring), pointer moves for Magnifier, focus/typing descriptions for Narrator, and on-screen keyboard keys (`a11yChannel`).
+- **Desktop Browser pages** forward DonutOS shortcuts to the shell (`before-input-event` → `browser:key`), so Win, Alt+Tab and Ctrl+Alt+… keep working inside web pages.
+- **ARIA:** `axe-core` reports no violations on the shell and the built-in apps.
+  - Windows are `role=group` with `aria-roledescription="window"`; apps use plain containers instead of landmarks (several apps share one page).
+  - Tab strips (`apps/common/tabs.js`), taskbar and Start (`ui/roving.js`) are single Tab stops with arrow keys; Win+T / Win+B focus the taskbar / tray.
+  - Accent fills use whichever of white/near-black text contrasts better (`ui/contrast.js`).
+- **Performance:**
+  - The mica offset variables are registered `@property … inherits: false`, so dragging a window doesn't restyle its contents (about 6× less style work per frame).
+  - Installed Store apps keep their code under `apps:code:<id>`, loaded when the app starts, so the installed-apps list stays small; older lists are migrated.
+  - Opening and closing every app repeatedly leaves DOM nodes and listeners flat.
 
 ## Security notes (desktop)
 

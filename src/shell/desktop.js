@@ -188,6 +188,12 @@ export class Desktop {
       if (it) this.itemMenu(it, e); else this.backgroundMenu(e);
     });
     el.addEventListener('keydown', (e) => this.onKey(e));
+    // Reaching the desktop with the keyboard selects an icon, so focus is visible and the arrows work.
+    el.addEventListener('focus', () => {
+      if (this.selected.size || !el.matches(':focus-visible')) return;
+      const first = el.querySelector('.dicon');
+      if (first) { this.anchor = first.dataset.key; this.select([first.dataset.key]); }
+    });
 
     // Drag and drop
     el.addEventListener('dragstart', (e) => {

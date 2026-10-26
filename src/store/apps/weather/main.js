@@ -39,7 +39,7 @@ export default function main(app) {
   let data = null, error = null, loading = false;
 
   const side = h('aside.wx-side');
-  const view = h('main.wx-main');
+  const view = h('div.wx-main');
   mount(app.root, h('div.wx', side, view));
 
   const t = (v) => `${Math.round(v)}°`;

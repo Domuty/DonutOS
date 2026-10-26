@@ -29,8 +29,8 @@ export default function main(ctx) {
   let category = null;
   const busy = new Set();    // app ids being installed
 
-  const nav = h('nav.st-nav');
-  const content = h('main.st-content');
+  const nav = h('nav.st-nav', { 'aria-label': 'Store' });
+  const content = h('div.st-content');
   mount(win.body, nav, content);
 
   // ── Catalogs ─────────────────────────────────────────────────────────

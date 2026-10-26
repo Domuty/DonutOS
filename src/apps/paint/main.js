@@ -46,7 +46,7 @@ export default function main(ctx) {
   const og = overlay.getContext('2d');
   const sizer = h('div.pt-sizer', canvas, overlay, h('div.pt-handle', { title: 'Drag to resize the canvas', onpointerdown: (e) => resizeDrag(e) }));
   const stage = h('div.pt-stage', sizer);
-  const status = h('footer.pt-status');
+  const status = h('div.pt-status');
   const ribbon = h('div.pt-ribbon', { role: 'toolbar', 'aria-label': 'Tools' });
   const textBox = h('textarea.pt-textbox', { hidden: true, spellcheck: false, 'aria-label': 'Text' });
   sizer.append(textBox);

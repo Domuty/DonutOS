@@ -31,8 +31,8 @@ export default function main(ctx) {
   const events = () => store.get('events', []);
   const saveEvents = (list) => store.set('events', list);
 
-  const side = h('aside.cal-side');
-  const head = h('header.cal-head');
+  const side = h('div.cal-side');
+  const head = h('div.cal-head');
   const body = h('div.cal-body');
   mount(win.body, side, h('div.cal-main', head, body));
 

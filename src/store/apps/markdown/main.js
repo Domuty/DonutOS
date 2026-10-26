@@ -41,7 +41,7 @@ export function render(md) {
     if (/^\s*([-*+]|\d+[.)])\s+/.test(l)) {
       const ordered = /^\s*\d/.test(l); const items = [];
       for (; i < L.length && /^\s*([-*+]|\d+[.)])\s+/.test(L[i]); i++) items.push(L[i].replace(/^\s*([-*+]|\d+[.)])\s+/, ''));
-      out.push(`<${ordered ? 'ol' : 'ul'}>${items.map((t) => { const tm = /^\[( |x)\]\s*(.*)$/i.exec(t); return tm ? `<li class="task"><input type="checkbox" disabled${tm[1].trim() ? ' checked' : ''}> ${inline(tm[2])}</li>` : `<li>${inline(t)}</li>`; }).join('')}</${ordered ? 'ol' : 'ul'}>`);
+      out.push(`<${ordered ? 'ol' : 'ul'}>${items.map((t) => { const tm = /^\[( |x)\]\s*(.*)$/i.exec(t); return tm ? `<li class="task"><label><input type="checkbox" disabled${tm[1].trim() ? ' checked' : ''}> ${inline(tm[2])}</label></li>` : `<li>${inline(t)}</li>`; }).join('')}</${ordered ? 'ol' : 'ul'}>`);
       continue;
     }
     if (/^\|.*\|\s*$/.test(l) && /^\|?\s*:?-+/.test(L[i + 1] || '')) {

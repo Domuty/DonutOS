@@ -181,6 +181,11 @@ export class Shell {
     add('shell.clipboard', ['Meta+V', 'Ctrl+Alt+V'], 'Clipboard history', () => this.view.clipboard.openFor('clipboard'));
     add('shell.emoji', ['Meta+Period', 'Ctrl+Alt+Period'], 'Emoji panel', () => this.view.clipboard.openFor('emoji'));
     add('shell.run', ['Meta+R', 'Ctrl+Alt+R'], 'Run', () => runDialog(k, this.view));
+    add('shell.focusTaskbar', ['Meta+T', 'Ctrl+Alt+T'], 'Move focus to the taskbar apps (then ←/→)', () => {
+      const btns = [...this.view.taskbar.appsEl.querySelectorAll('button')];
+      (btns.find((b) => b.tabIndex === 0) || btns[0])?.focus();
+    });
+    add('shell.focusTray', ['Meta+B', 'Ctrl+Alt+B'], 'Move focus to the system tray', () => this.view.el.querySelector('.tb-tray')?.focus());
     add('shell.lock', ['Meta+L', 'Ctrl+Alt+L'], 'Lock', () => this.lock());
     add('shell.settings', ['Meta+I', 'Ctrl+Alt+I'], 'Settings', () => launchApp(k, 'settings'));
     add('shell.explorer', ['Meta+E', 'Ctrl+Alt+E'], 'File Explorer', () => launchApp(k, 'explorer'), 'Shell', { when: () => when() && k.registry.has('explorer') });

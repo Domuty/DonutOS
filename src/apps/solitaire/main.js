@@ -22,7 +22,7 @@ export default function main(ctx) {
   let anim = new Set();
 
   const table = h('div.so-table', { tabindex: '0' });
-  const bar = h('header.so-bar');
+  const bar = h('div.so-bar');
   mount(win.body, bar, table);
 
   // ── Game state ───────────────────────────────────────────────────────

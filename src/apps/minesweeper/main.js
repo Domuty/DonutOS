@@ -24,7 +24,7 @@ export default function main(ctx) {
   let cellEls = [];
   const status = h('div.ms-status', { 'aria-live': 'polite' });
   mount(win.body,
-    h('header.ms-bar', h('button.btn.subtle', { type: 'button', onclick: (e) => menu(e.currentTarget) }, 'Game ▾'), h('div.mp-grow'), status),
+    h('div.ms-bar', h('button.btn.subtle', { type: 'button', onclick: (e) => menu(e.currentTarget) }, 'Game ▾'), h('div.mp-grow'), status),
     h('div.ms-board', h('div.ms-top', counter, face, clock), h('div.ms-gridwrap', grid)));
 
   function dims() {

@@ -65,7 +65,7 @@ export default function main(app) {
       const t = { id: uid(), title: input.value.trim(), done: false, created: Date.now(), list: lists.some((l) => l.id === view) ? view : 'tasks', important: view === 'important', myDay: view === 'myday' ? today() : null, due: view === 'planned' ? today() : null, steps: [], notes: '', remind: null };
       tasks = [...tasks, t]; save(); input.value = ''; render(); setTimeout(() => root.querySelector('.td-add input')?.focus());
     } });
-    const main = h('main.td-main',
+    const main = h('div.td-main',
       h('div.td-head', h('div.row', h('h1.grow', listName), view !== 'all' && !VIEWS[view] ? null : null,
         h('button.btn.subtle', { type: 'button', onclick: () => { showDone = !showDone; app.storage.set('showDone', showDone); render(); } }, showDone ? 'Hide completed' : 'Show completed')),
       h('small', view === 'myday' ? new Date().toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' }) : `${open.length} to do`)),

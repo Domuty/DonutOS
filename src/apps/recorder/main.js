@@ -26,8 +26,8 @@ export default function main(ctx) {
   let speed = 1;
   const marks = () => store.get('marks', {});
 
-  const listEl = h('aside.rc-list');
-  const stage = h('main.rc-stage');
+  const listEl = h('div.rc-list');
+  const stage = h('div.rc-stage');
   mount(win.body, listEl, stage);
   const audio = new Audio();
   audio.preload = 'metadata';

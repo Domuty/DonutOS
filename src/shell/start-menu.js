@@ -1,6 +1,7 @@
 // Start: pinned apps (pin/unpin/reorder), All apps A–Z, recommended recent files and apps,
 // account and power menus. Typing anywhere in Start jumps to Search.
 
+import { roving } from '../ui/roving.js';
 import { h, mount } from '../ui/h.js';
 import { icon } from '../ui/icons.js';
 import { avatar } from '../ui/avatar.js';
@@ -64,12 +65,14 @@ export class StartMenu {
   home() {
     const pins = pinned(this.kernel, 'start');
     const grid = h('div.start-pins', { role: 'group', 'aria-label': 'Pinned apps' }, pins.map((id) => this.pinTile(id)));
+    // One Tab stop; arrow keys move around the grid.
+    requestAnimationFrame(() => roving(grid, '.start-app', { grid: true }));
     const rec = this.recommended();
     return h('div.start-body',
-      h('div.start-head', h('h3', 'Pinned'), h('button.btn.small', { type: 'button', onclick: () => { this.view = 'all'; this.render(); } }, 'All apps', icon('chevronRight', { size: 14 }))),
+      h('div.start-head', h('h2', 'Pinned'), h('button.btn.small', { type: 'button', onclick: () => { this.view = 'all'; this.render(); } }, 'All apps', icon('chevronRight', { size: 14 }))),
       pins.length ? grid : h('p.start-empty', 'Right-click an app in All apps to pin it here.'),
       this.settings.get('start.showRecent') || this.settings.get('start.showRecentApps') ? [
-        h('div.start-head', h('h3', 'Recommended')),
+        h('div.start-head', h('h2', 'Recommended')),
         rec.length ? h('div.start-rec', rec) : h('p.start-empty', 'Files you open and apps you install recently will show up here.'),
       ] : null);
   }
@@ -131,8 +134,9 @@ export class StartMenu {
           h('img', { src: a.icon, alt: '' }), h('span', a.name, a.description ? h('small', a.description) : null)));
       }
     }
+    requestAnimationFrame(() => roving(list, '.start-row', { vertical: true }));
     return h('div.start-body',
-      h('div.start-head', h('h3', 'All apps'), h('button.btn.small', { type: 'button', onclick: () => { this.view = 'home'; this.render(); } }, icon('chevronDown', { size: 14 }), 'Back')),
+      h('div.start-head', h('h2', 'All apps'), h('button.btn.small', { type: 'button', onclick: () => { this.view = 'home'; this.render(); } }, icon('chevronDown', { size: 14 }), 'Back')),
       list);
   }
 

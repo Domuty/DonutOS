@@ -42,7 +42,7 @@ export default function main(ctx) {
 
   const page = h('div.wr-page', { contenteditable: 'true', tabindex: '0', spellcheck: String(spell), role: 'textbox', 'aria-multiline': 'true', 'aria-label': 'Document' });
   const scroller = h('div.wr-scroll', h('div.wr-zoom', page));
-  const status = h('footer.wr-status');
+  const status = h('div.wr-status');
   const tb = h('div.wr-toolbar', { role: 'toolbar', 'aria-label': 'Formatting' });
 
   const doc = new Document(ctx, win, {

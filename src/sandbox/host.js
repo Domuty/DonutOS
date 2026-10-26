@@ -6,7 +6,7 @@
 // it does for built-in apps.
 
 import { h } from '../ui/h.js';
-import { showMenu } from '../ui/menu.js';
+import { showMenu, closeMenu } from '../ui/menu.js';
 import { alertDialog, confirmDialog, promptDialog } from '../ui/dialog.js';
 import { openFileDialog, saveFileDialog } from '../ui/file-dialog.js';
 import { PERMISSIONS } from '../core/permissions.js';
@@ -48,14 +48,15 @@ async function runSandboxed(app, ctx) {
   const [sdk, sdkCss, a11yName, editActions] = await sdkAssets();
   const frame = h('iframe.sandbox-frame', { sandbox: 'allow-scripts allow-forms allow-pointer-lock', title: app.name, allow: 'clipboard-write; autoplay; fullscreen' });
   const csp = "default-src 'none'; script-src 'unsafe-inline' data:; style-src 'unsafe-inline' data:; img-src data: blob:; media-src data: blob:; font-src data:; connect-src data: blob:; worker-src blob: data:";
-  frame.srcdoc = `<!doctype html><html><head><meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="${csp}">
+  const esc = (t) => String(t).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
+  frame.srcdoc = `<!doctype html><html lang="${esc(document.documentElement.lang || navigator.language || 'en')}"><head><meta charset="utf-8"><title>${esc(app.name)}</title><meta http-equiv="Content-Security-Policy" content="${csp}">
 <style>${sdkCss}</style>
 <script type="importmap">${JSON.stringify({ imports: {
     '@donut/sdk': `data:text/javascript;base64,${b64(sdk)}`,
     '@donut/a11y-name': `data:text/javascript;base64,${b64(a11yName)}`,
     '@donut/edit-actions': `data:text/javascript;base64,${b64(editActions)}`,
   } })}</script>
-<script type="module">import '@donut/sdk';</script></head><body><div id="app"></div></body></html>`;
+<script type="module">import '@donut/sdk';</script></head><body><main id="app" aria-label="${esc(app.name)}"></main></body></html>`;
   win.body.append(frame);
 
   const me = ctx.accounts.current();
@@ -145,6 +146,8 @@ async function runSandboxed(app, ctx) {
       // System shortcuts pressed inside the app go to the shell.
       document.dispatchEvent(new KeyboardEvent(m.kind === 'keyup' ? 'keyup' : 'keydown', { ...m.event, bubbles: true, cancelable: true }));
     } else if (m.type === 'activity') {
+      // A click inside the app: menus close, as they do for clicks anywhere else.
+      closeMenu();
       if (!win.active) win.focus();
     } else if (m.type === 'started') {
       started = true;

@@ -70,7 +70,7 @@ export default function main(app) {
       h('h3', 'Contrast'),
       h('div.co-contrast',
         h('div.co-sample', { style: { background: color, color: text } }, h('b', { style: { fontSize: '20px' } }, 'Large text sample'), h('p', { style: { margin: '6px 0 0' } }, 'Regular body text on this background.')),
-        h('div.stack', h('div.row', h('small', 'Text colour'), h('input', { type: 'color', value: text, oninput: (e) => { text = e.target.value; app.storage.set('text', text); render(); } }),
+        h('div.stack', h('div.row', h('small', 'Text colour'), h('input', { type: 'color', value: text, 'aria-label': 'Text colour', oninput: (e) => { text = e.target.value; app.storage.set('text', text); render(); } }),
           h('button.btn.subtle', { type: 'button', onclick: () => { text = lum(color) > 0.179 ? '#000000' : '#ffffff'; app.storage.set('text', text); render(); } }, 'Best black/white')),
           h('div', h('b', { style: { fontSize: '22px' } }, `${cr.toFixed(2)} : 1`)),
           h('div', 'Normal text: ', h('span', { class: cr >= 7 ? 'pass' : cr >= 4.5 ? 'pass' : 'fail' }, cr >= 7 ? 'AAA' : cr >= 4.5 ? 'AA' : 'Fails')),

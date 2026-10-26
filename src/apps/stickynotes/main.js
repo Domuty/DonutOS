@@ -38,7 +38,7 @@ export default function main(ctx) {
       }) : h('p.calc-empty', q ? 'No notes match.' : 'Select + to create your first note.'));
     };
     mount(listWin.body,
-      h('header.sn-list-head', h('button.tb-btn', { type: 'button', 'aria-label': 'New note', title: 'New note (Ctrl+N)', onclick: () => newNote() }, icon('plus', { size: 18 })), h('b', 'Sticky Notes')),
+      h('div.sn-list-head', h('button.tb-btn', { type: 'button', 'aria-label': 'New note', title: 'New note (Ctrl+N)', onclick: () => newNote() }, icon('plus', { size: 18 })), h('b', 'Sticky Notes')),
       h('div.sn-search', search), items);
     paint();
     const off = store.watch('notes', paint);

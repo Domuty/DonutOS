@@ -15,7 +15,7 @@ const INVOKE = new Set([
   'capture:screen',
   'browser:setDownloadDir', 'browser:cancelDownload', 'browser:clearData', 'browser:sendKey',
 ]);
-const EVENTS = new Set(['updates:status', 'display:fullscreen', 'shell:closeRequest', 'browser:open', 'browser:download', 'browser:contextMenu']);
+const EVENTS = new Set(['updates:status', 'display:fullscreen', 'shell:closeRequest', 'browser:open', 'browser:download', 'browser:contextMenu', 'browser:key']);
 
 const config = ipcRenderer.sendSync('app:config');
 let fullscreen = !!config.fullscreen;

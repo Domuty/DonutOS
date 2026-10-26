@@ -1,6 +1,7 @@
 // The taskbar: Start, Search, widgets/weather, pinned and running apps (with live previews
 // and jump lists), system tray (network, volume, battery), clock and notifications.
 
+import { roving } from '../ui/roving.js';
 import { h, mount } from '../ui/h.js';
 import { icon, batteryIcon, iconMarkup } from '../ui/icons.js';
 import { showMenu } from '../ui/menu.js';
@@ -31,6 +32,8 @@ export class Taskbar {
     this.taskViewBtn = h('button.tb-btn', { type: 'button', title: 'Task view', 'aria-label': 'Task view', 'aria-pressed': 'false', onclick: () => session.taskView.toggle() }, taskViewIcon());
     this.weatherBtn = h('button.tb-weather', { type: 'button', title: 'Widgets', 'aria-label': 'Widgets', 'aria-expanded': 'false', onclick: () => session.flyouts.toggle('widgets') });
     this.appsEl = h('div.tb-apps', { role: 'group', 'aria-label': 'Apps' });
+    // App buttons are one Tab stop; ←/→ move between them (Win+T jumps here).
+    this.appsNav = roving(this.appsEl, 'button');
     this.center = h('div.tb-center', this.startBtn, this.searchBox, this.searchIcon, this.taskViewBtn, this.appsEl);
     this.left = h('div.tb-left');
     this.trayBtn = h('button.tb-tray', { type: 'button', 'aria-label': 'Quick settings', 'aria-expanded': 'false', onclick: () => session.flyouts.toggle('qs') });
@@ -141,6 +144,7 @@ export class Taskbar {
       else for (const w of item.windows) buttons.push(this.appButton(item, [w], active, w.title));
     }
     mount(this.appsEl, buttons);
+    this.appsNav.refresh();
   }
 
   appButton(item, windows, active, label) {

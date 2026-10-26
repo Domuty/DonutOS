@@ -36,10 +36,10 @@ export default function main(ctx) {
   const media = h('video.mp-media', { preload: 'metadata', playsinline: true });
   media.volume = store.get('volume', 0.8);
   media.muted = store.get('muted', false);
-  const nav = h('nav.mp-nav');
-  const content = h('main.mp-content');
+  const nav = h('nav.mp-nav', { 'aria-label': 'Library' });
+  const content = h('div.mp-content');
   const nowPlaying = h('div.mp-now', { hidden: true }, media);
-  const bar = h('footer.mp-bar');
+  const bar = h('div.mp-bar');
   mount(win.body, h('div.mp-wrap', nav, h('div.mp-main', content, nowPlaying)), bar);
 
   // ── Library ──────────────────────────────────────────────────────────
@@ -115,7 +115,7 @@ export default function main(ctx) {
       }) : h('div.ph-empty', icon(page === 'videos' ? 'camera' : 'volume', { size: 40 }), h('b', query ? 'Nothing matches your search' : page === 'queue' ? 'The play queue is empty' : pl ? 'This playlist is empty' : `No ${heading.toLowerCase()} yet`),
         h('p', page === 'music' ? 'Media Player shows music in your Music and Downloads folders. Select “Open files…” to play something from anywhere.' : page === 'videos' ? 'Videos in your Videos and Downloads folders appear here.' : 'Right-click a song and choose “Add to” to fill it.')));
     };
-    mount(content, h('header.mp-head', h('h1', heading), h('div.mp-grow'), search, rows.length ? h('button.btn.primary', { type: 'button', onclick: () => playList(rows, 0) }, '▶ Play all') : null,
+    mount(content, h('div.mp-head', h('h1', heading), h('div.mp-grow'), search, rows.length ? h('button.btn.primary', { type: 'button', onclick: () => playList(rows, 0) }, '▶ Play all') : null,
       rows.length > 1 ? h('button.btn', { type: 'button', onclick: () => { setShuffle(true); playList(rows, Math.floor(Math.random() * rows.length)); } }, '⤨ Shuffle') : null, actions),
     page !== 'videos' ? h('div.mp-row.mp-header', h('span'), h('span', 'Title'), h('span', 'Artist'), h('span', 'Album'), h('span', 'Length'), h('span')) : null,
     listEl);

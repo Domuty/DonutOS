@@ -31,7 +31,7 @@ export default function main(ctx) {
   win.titlebar.append(tabStrip);
   const stage = h('div.np-stage');
   const findBar = h('div.np-find', { hidden: true });
-  const status = h('footer.np-status');
+  const status = h('div.np-status');
   const tabs = [];
   let active = null;
 

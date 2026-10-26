@@ -1,5 +1,5 @@
 {
-  "id": "donutos.markdown", "name": "Markdown Studio", "version": "1.0.0", "author": "DonutOS",
+  "id": "donutos.markdown", "name": "Markdown Studio", "version": "1.0.1", "author": "DonutOS",
   "category": "Productivity", "summary": "Write Markdown with a live preview",
   "description": "A two-pane Markdown editor: write on the left, see the formatted result on the right as you type. Headings, lists, task lists, tables, code blocks, quotes, links and images. Opens and saves .md files, and exports HTML.",
   "features": ["Live preview", "Task lists and tables", "Export to HTML", "Word count"],

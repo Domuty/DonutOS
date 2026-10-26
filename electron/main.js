@@ -196,6 +196,14 @@ function guardWebviews() {
       return { action: 'deny' };
     });
     contents.on('will-navigate', (e, url) => { if (!/^(https?:|about:|data:)/i.test(url)) e.preventDefault(); });
+    // DonutOS's own shortcuts (Win, Alt+Tab, Ctrl+Alt+…) keep working while a web page has focus.
+    contents.on('before-input-event', (e, input) => {
+      const system = input.key === 'Meta' || input.meta || (input.control && input.alt) || (input.alt && ['Tab', 'F4', 'Escape'].includes(input.key))
+        || (input.control && input.shift && input.key === 'Escape') || (input.alt && input.shift && input.key === 'PrintScreen');
+      if (!system) return;
+      if (input.key !== 'Meta') e.preventDefault();
+      send('browser:key', { type: input.type === 'keyUp' ? 'keyup' : 'keydown', key: input.key, code: input.code, ctrlKey: input.control, altKey: input.alt, shiftKey: input.shift, metaKey: input.meta, repeat: input.isAutoRepeat });
+    });
     contents.on('context-menu', (_e, p) => send('browser:contextMenu', {
       webContentsId: contents.id, x: p.x, y: p.y, linkURL: p.linkURL, srcURL: p.srcURL, mediaType: p.mediaType,
       selectionText: p.selectionText, isEditable: p.isEditable, pageURL: p.pageURL,

@@ -1,5 +1,5 @@
 {
-  "id": "donutos.todo", "name": "To Do", "version": "1.0.0", "author": "DonutOS",
+  "id": "donutos.todo", "name": "To Do", "version": "1.0.1", "author": "DonutOS",
   "category": "Productivity", "summary": "Lists, due dates and reminders",
   "description": "Keep track of what you need to do. Make lists, plan My Day, star important tasks, add due dates, steps and notes, and get a notification when a reminder is due while To Do is open.",
   "features": ["Multiple lists", "My Day and Important", "Due dates and reminders", "Steps and notes"],

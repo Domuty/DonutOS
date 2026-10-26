@@ -8,7 +8,7 @@ import { assertAdapter } from '../platform/adapter.js';
 import { createKernel } from '../core/kernel.js';
 import { EventBus } from '../core/event-bus.js';
 import { SettingsStore } from '../core/settings.js';
-import { validateManifest } from '../core/registry.js';
+import { validateManifest, AppRegistry } from '../core/registry.js';
 import * as P from '../core/path.js';
 import { sleep } from '../core/util.js';
 import { tokenize, parse, Shell, getopts, ShellSyntaxError } from '../apps/terminal/shell.js';
@@ -1048,6 +1048,26 @@ test('accessibility: contrast themes replace the colours and turn transparency o
   assert.equal(root.style.getPropertyValue('--bg'), '');
   assert.equal(root.style.getPropertyValue('--accent'), '#e8618c');
   applyTheme(kernel.settings); // put the real theme back
+});
+
+test('installed apps keep their code out of the app list, and old lists are migrated', async () => {
+  const reg = new AppRegistry({ kv: prefixedKv, bus: new EventBus() });
+  const code = 'export default function main(app) {}';
+  await reg.install({ id: `t${RUN}.small`, name: 'Small', version: '1.0.0', source: code });
+  const list = await prefixedKv.get('apps:installed');
+  assert.equal(list.length, 1);
+  assert.equal(list[0].source, undefined);
+  assert.equal(list[0].codeStored, true);
+  assert.equal(await reg.code(`t${RUN}.small`), code);
+  assert.equal(reg.get(`t${RUN}.small`).sandboxed, true);
+  // A list written by an older DonutOS (code inside):
+  await prefixedKv.set('apps:installed', [{ id: `t${RUN}.old`, name: 'Old', version: '1.0.0', source: code, installedAt: 1 }]);
+  const again = new AppRegistry({ kv: prefixedKv, bus: new EventBus() });
+  await again.loadInstalled();
+  assert.equal((await prefixedKv.get('apps:installed'))[0].source, undefined);
+  assert.equal(await again.code(`t${RUN}.old`), code);
+  await again.uninstall(`t${RUN}.old`);
+  assert.ok((await prefixedKv.get(`apps:code:t${RUN}.old`)) == null, "code removed with the app");
 });
 
 run({

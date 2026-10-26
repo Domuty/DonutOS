@@ -58,7 +58,7 @@ export class AppWindow {
     this.titlebar = h('div.win-titlebar', this.iconEl, this.titleEl, this.titlebarSlot, h('div.win-controls', this.minBtn, this.maxBtn, this.closeBtn));
     // The body takes keyboard focus when nothing inside the app has it, so app shortcuts work.
     this.body = h('div.win-body', { tabindex: '-1' });
-    this.el = h('section.win', { role: 'dialog', 'aria-label': this.title, tabindex: '-1', dataset: { id: this.id, app: this.appId } }, this.titlebar, this.body);
+    this.el = h('div.win', { role: 'group', 'aria-roledescription': 'window', 'aria-label': this.title, tabindex: '-1', dataset: { id: this.id, app: this.appId } }, this.titlebar, this.body);
     if (o.resizable) for (const d of ['n', 's', 'e', 'w', 'ne', 'nw', 'se', 'sw']) this.el.append(h(`div.rz.rz-${d}`, { dataset: { dir: d } }));
     this.el.addEventListener('pointerdown', () => this.wm.focus(this), true);
     this.el.addEventListener('focusin', (e) => { this.lastFocus = e.target; });

@@ -363,10 +363,10 @@ export default function main(ctx) {
       if (st && canRead(st.path)) recent.push({ ...st, opened: r.time });
     }
     mount(content, h('div.ex-home',
-      h('h3', 'Quick access'),
+      h('h2', 'Quick access'),
       h('div.ex-quick', pins.map((p) => h('button.ex-quick-item', { type: 'button', onclick: () => navigate(p), oncontextmenu: (e) => { e.preventDefault(); navMenu(p, e); }, ...crumbDrop(p) },
         h('img', { src: fileIconUrl('folder'), alt: '' }), h('span', h('b', P.basename(p)), h('small', ex.prettyPath(P.dirname(p))))))),
-      h('h3', 'Recent'),
+      h('h2', 'Recent'),
       recent.length ? h('div.ex-recent', recent.map((e) => h('button.ex-recent-row', { type: 'button', onclick: () => ex.openEntry(e) },
         h('img', { src: iconForEntry(e), alt: '' }), h('span.c-name', e.name), h('span', new Date(e.opened).toLocaleString(undefined, { dateStyle: 'short', timeStyle: 'short' })), h('span', ex.prettyPath(P.dirname(e.path))))))
         : h('p.hint', 'Files you open will show up here.')));

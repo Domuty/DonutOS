@@ -63,11 +63,11 @@ export default function main(ctx) {
     win.body.classList.remove('viewing');
     const search = h('input.input.ph-search', { type: 'search', placeholder: 'Search pictures', value: query, 'aria-label': 'Search pictures',
       oninput: (e) => { query = e.target.value.trim().toLowerCase(); paint(); } });
-    const tabs = h('nav.ph-tabs', [['all', 'All photos', 'image'], ['favorites', 'Favourites', 'sparkle'], ['folders', 'Folders', 'folder']].map(([id, label, ic]) =>
+    const tabs = h('nav.ph-tabs', { 'aria-label': 'Views' }, [['all', 'All photos', 'image'], ['favorites', 'Favourites', 'sparkle'], ['folders', 'Folders', 'folder']].map(([id, label, ic]) =>
       h('button.ph-tab', { type: 'button', 'aria-current': section === id ? 'page' : undefined, onclick: () => { section = id; openedFolder = null; store.set('section', id); renderGallery(); } }, icon(ic, { size: 16 }), label)));
     const grid = h('div.ph-grid-wrap');
     mount(content,
-      h('header.ph-head', tabs, h('div.ph-grow'), search,
+      h('div.ph-head', tabs, h('div.ph-grow'), search,
         h('button.btn', { type: 'button', onclick: importPictures }, icon('upload', { size: 16 }), 'Import'),
         h('button.tb-btn', { type: 'button', title: 'Library folders', 'aria-label': 'Library folders', onclick: (e) => folderMenu(e.currentTarget) }, icon('settings', { size: 16 }))),
       grid);
@@ -182,8 +182,8 @@ export default function main(ctx) {
     win.body.classList.add('viewing');
     imgEl = h('img.ph-img', { alt: '', draggable: 'false' });
     stage = h('div.ph-stage', { tabindex: '0' }, imgEl);
-    chrome = h('header.ph-vbar');
-    infoEl = h('aside.ph-info', { hidden: !infoOpen });
+    chrome = h('div.ph-vbar');
+    infoEl = h('div.ph-info', { hidden: !infoOpen });
     filmstrip = h('div.ph-film');
     mount(content, chrome, h('div.ph-vbody', stage, infoEl), filmstrip,
       h('button.ph-nav.prev', { type: 'button', 'aria-label': 'Previous picture', onclick: () => step(-1) }, icon('chevronRight', { size: 22 })),
@@ -382,8 +382,8 @@ export default function main(ctx) {
     const preview = h('canvas.ph-edit-canvas');
     const cropBox = h('div.ph-crop', { hidden: true });
     const wrap = h('div.ph-edit-stage', preview, cropBox);
-    const panel = h('aside.ph-edit-panel');
-    const editor = h('div.ph-editor', h('header.ph-vbar',
+    const panel = h('div.ph-edit-panel');
+    const editor = h('div.ph-editor', h('div.ph-vbar',
       h('button.btn.subtle', { type: 'button', onclick: () => close() }, icon('close', { size: 14 }), 'Cancel'),
       h('span.ph-name', `Editing ${e.name}`), h('div.ph-grow'),
       h('button.btn', { type: 'button', onclick: async () => { const st = await saveCopy(e, render(true)); if (st) { close(); index = list.findIndex((x) => x.path === st.path); showCurrent(); } } }, 'Save as copy'),

@@ -33,7 +33,7 @@ export default function main(ctx) {
   let messages = [];
   let counts = {};
 
-  const nav = h('nav.ml-nav');
+  const nav = h('nav.ml-nav', { 'aria-label': 'Folders' });
   const listEl = h('section.ml-list');
   const reader = h('section.ml-reader');
   mount(win.body, nav, listEl, reader);
@@ -90,7 +90,7 @@ export default function main(ctx) {
       h('div.ml-item-prev', preview(m))))
         : h('div.ph-empty', icon('file', { size: 36 }), h('b', query ? 'No messages match' : `Nothing in ${FOLDERS.find((f) => f[0] === folder)[1]}`), folder === 'inbox' && !query ? h('p', `Your address is ${myAddress}. People with accounts on this device can mail you here.`) : null));
     };
-    mount(listEl, h('header.ml-listhead', h('h2', FOLDERS.find((f) => f[0] === folder)[1]),
+    mount(listEl, h('div.ml-listhead', h('h2', FOLDERS.find((f) => f[0] === folder)[1]),
       folder === 'deleted' && messages.length ? h('button.btn.subtle', { type: 'button', onclick: async () => { if (await confirmDialog('Empty Deleted?', 'Messages in Deleted are removed for good.', { ok: 'Empty', danger: true, parent: win.body })) { await mail.emptyDeleted(uid); refresh(); } } }, 'Empty') : null), h('div.ml-search', search), items);
     paint();
   }

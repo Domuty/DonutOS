@@ -4,7 +4,7 @@
   {
    "id": "donutos.colors",
    "name": "Colors",
-   "version": "1.0.0",
+   "version": "1.0.1",
    "author": "DonutOS",
    "description": "Pick any colour, see it as HEX, RGB and HSL, generate matching palettes (complementary, analogous, triadic, shades), check text contrast against WCAG, and keep your favourite colours. Click any value to copy it.",
    "summary": "Pick colours, build palettes, check contrast",
@@ -18,7 +18,7 @@
     "WCAG contrast check",
     "Saved swatches"
    ],
-   "size": 8537,
+   "size": 8566,
    "package": "donutos.colors.dapp",
    "icon": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2NCA2NCI+PHJlY3Qgd2lkdGg9IjY0IiBoZWlnaHQ9IjY0IiByeD0iMTQiIGZpbGw9IiNmZmYiLz48Y2lyY2xlIGN4PSIyNCIgY3k9IjI2IiByPSIxMyIgZmlsbD0iI2U4NjE4YyIgb3BhY2l0eT0iLjkiLz48Y2lyY2xlIGN4PSI0MCIgY3k9IjI2IiByPSIxMyIgZmlsbD0iIzRjYjc4MiIgb3BhY2l0eT0iLjkiLz48Y2lyY2xlIGN4PSIzMiIgY3k9IjQwIiByPSIxMyIgZmlsbD0iIzViN2NmMCIgb3BhY2l0eT0iLjkiLz48L3N2Zz4=",
    "updated": null
@@ -45,7 +45,7 @@
   {
    "id": "donutos.markdown",
    "name": "Markdown Studio",
-   "version": "1.0.0",
+   "version": "1.0.1",
    "author": "DonutOS",
    "description": "A two-pane Markdown editor: write on the left, see the formatted result on the right as you type. Headings, lists, task lists, tables, code blocks, quotes, links and images. Opens and saves .md files, and exports HTML.",
    "summary": "Write Markdown with a live preview",
@@ -60,7 +60,7 @@
     "Export to HTML",
     "Word count"
    ],
-   "size": 11043,
+   "size": 11058,
    "package": "donutos.markdown.dapp",
    "icon": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2NCA2NCI+PHJlY3Qgd2lkdGg9IjY0IiBoZWlnaHQ9IjY0IiByeD0iMTQiIGZpbGw9IiMyYjJmM2EiLz48cGF0aCBkPSJNMTIgNDRWMjBoNmw3IDkgNy05aDZ2MjRoLTZWMzBsLTcgOS03LTl2MTR6IiBmaWxsPSIjZmZmIi8+PHBhdGggZD0iTTQ2IDIwaDZ2MTRoNWwtOCAxMC04LTEwaDV6IiBmaWxsPSIjNmFhOGZmIi8+PC9zdmc+",
    "updated": null
@@ -110,7 +110,7 @@
   {
    "id": "donutos.todo",
    "name": "To Do",
-   "version": "1.0.0",
+   "version": "1.0.1",
    "author": "DonutOS",
    "description": "Keep track of what you need to do. Make lists, plan My Day, star important tasks, add due dates, steps and notes, and get a notification when a reminder is due while To Do is open.",
    "summary": "Lists, due dates and reminders",
@@ -124,7 +124,7 @@
     "Due dates and reminders",
     "Steps and notes"
    ],
-   "size": 13346,
+   "size": 13345,
    "package": "donutos.todo.dapp",
    "icon": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2NCA2NCI+PGRlZnM+PGxpbmVhckdyYWRpZW50IGlkPSJhIiB4MT0iMCIgeTE9IjAiIHgyPSIxIiB5Mj0iMSI+PHN0b3Agb2Zmc2V0PSIwIiBzdG9wLWNvbG9yPSIjNWI3Y2YwIi8+PHN0b3Agb2Zmc2V0PSIxIiBzdG9wLWNvbG9yPSIjM2I0ZmM0Ii8+PC9saW5lYXJHcmFkaWVudD48L2RlZnM+PHJlY3Qgd2lkdGg9IjY0IiBoZWlnaHQ9IjY0IiByeD0iMTQiIGZpbGw9InVybCgjYSkiLz48cGF0aCBkPSJNMTggMzNsOSA5IDE5LTIwIiBmaWxsPSJub25lIiBzdHJva2U9IiNmZmYiIHN0cm9rZS13aWR0aD0iNyIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBzdHJva2UtbGluZWpvaW49InJvdW5kIi8+PC9zdmc+",
    "updated": null
@@ -151,7 +151,7 @@
   {
    "id": "donutos.weather",
    "name": "Weather",
-   "version": "1.0.0",
+   "version": "1.0.1",
    "author": "DonutOS",
    "description": "Current conditions, a 24-hour forecast and the week ahead for any city in the world, from the free Open-Meteo service. Save your favourite places and switch between °C and °F.",
    "summary": "Forecasts for any city",
@@ -166,7 +166,7 @@
     "Saved places",
     "Use your location"
    ],
-   "size": 13101,
+   "size": 13100,
    "package": "donutos.weather.dapp",
    "icon": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2NCA2NCI+PGRlZnM+PGxpbmVhckdyYWRpZW50IGlkPSJhIiB4MT0iMCIgeTE9IjAiIHgyPSIwIiB5Mj0iMSI+PHN0b3Agb2Zmc2V0PSIwIiBzdG9wLWNvbG9yPSIjNGZhOGY3Ii8+PHN0b3Agb2Zmc2V0PSIxIiBzdG9wLWNvbG9yPSIjMjQ2M2M5Ii8+PC9saW5lYXJHcmFkaWVudD48L2RlZnM+PHJlY3Qgd2lkdGg9IjY0IiBoZWlnaHQ9IjY0IiByeD0iMTQiIGZpbGw9InVybCgjYSkiLz48Y2lyY2xlIGN4PSIyNSIgY3k9IjI1IiByPSIxMCIgZmlsbD0iI2ZmZDM0ZCIvPjxwYXRoIGQ9Ik0yMiA0NmgyNGE4IDggMCAwIDAgMC0xNiAxMSAxMSAwIDAgMC0yMS0yIDggOCAwIDAgMC0zIDE4eiIgZmlsbD0iI2ZmZiIvPjwvc3ZnPg==",
    "updated": null

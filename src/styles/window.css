@@ -1,6 +1,11 @@
 /* Application windows. Mica: windows show a softly blurred copy of the wallpaper
    (--mica, set per session) aligned to the screen, tinted by the theme. */
 
+/* The mica offset only matters to the window itself: not inherited, so moving a window
+   doesn't restyle everything inside it on every frame. */
+@property --mx { syntax: '<length>'; inherits: false; initial-value: 0px; }
+@property --my { syntax: '<length>'; inherits: false; initial-value: 0px; }
+
 .windows-layer { position: absolute; inset: 0; pointer-events: none; z-index: 2; }
 .windows-layer > * { pointer-events: auto; }
 

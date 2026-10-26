@@ -76,7 +76,7 @@ export default function main(ctx) {
   const search = h('input.input.tm-search', { type: 'search', placeholder: 'Type a name, publisher, or PID to search', 'aria-label': 'Search processes', oninput: () => { query = search.value.trim().toLowerCase(); render(); } });
   const actions = h('div.tm-actions');
   const content = h('div.tm-content', { tabindex: '-1' });
-  mount(win.body, h('div.tm', rail, h('div.tm-main', h('header.tm-head', title, search, actions), content)));
+  mount(win.body, h('div.tm', rail, h('div.tm-main', h('div.tm-head', title, search, actions), content)));
 
   function renderRail() {
     mount(rail, PAGES.map(([id, label, ic]) => h('button.tm-nav', { type: 'button', 'aria-current': page === id ? 'page' : undefined, title: label, onclick: () => go(id) }, icon(ic, { size: 18 }), h('span', label))),

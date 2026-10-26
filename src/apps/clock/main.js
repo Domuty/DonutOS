@@ -24,7 +24,7 @@ export default function main(ctx) {
   let page = PAGES.some(([p]) => p === ctx.args.page) ? ctx.args.page : store.get('page', 'timer');
 
   const nav = h('nav.ck-nav', { 'aria-label': 'Clock' });
-  const content = h('main.ck-content');
+  const content = h('div.ck-content');
   mount(win.body, nav, content);
 
   const get = (key, fb) => store.get(key, fb);

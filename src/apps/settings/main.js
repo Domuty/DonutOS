@@ -19,7 +19,7 @@ export default function main(ctx) {
 
   const nav = h('nav.set-nav', { 'aria-label': 'Settings sections' });
   const content = h('div.set-content', { tabindex: '-1' });
-  const main = h('main.set-main', content);
+  const main = h('div.set-main', content);
   mount(win.body, h('div.set-app', nav, main));
   liveToggles(content);
 

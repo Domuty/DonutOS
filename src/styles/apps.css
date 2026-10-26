@@ -173,7 +173,7 @@ button.ex-twisty:hover { background: var(--hover); }
 .ex-icon textarea.ex-rename { width: 100%; text-align: center; font-size: 12px; }
 /* home */
 .ex-home { overflow: auto; padding: 16px 24px 32px; }
-.ex-home h3 { font-size: 14px; font-weight: 600; margin: 8px 0 10px; }
+.ex-home h2, .ex-home h3 { font-size: 14px; font-weight: 600; margin: 8px 0 10px; }
 .ex-quick { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 6px; margin-bottom: 18px; }
 .ex-quick-item { display: flex; align-items: center; gap: 12px; padding: 10px; border: 1px solid transparent; border-radius: var(--radius); background: none; color: inherit; text-align: left; cursor: var(--cur-default, default); }
 .ex-quick-item:hover { background: var(--hover); }

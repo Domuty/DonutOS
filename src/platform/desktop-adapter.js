@@ -7,6 +7,8 @@ import { createWebviewView } from './desktop/web-view.js';
 import { batteryStatus, onBatteryChange, browserNetwork, onBrowserNetworkChange, fullscreenApi } from './common/browser-apis.js';
 
 export function createDesktopAdapter(native = window.donutNative) {
+  // Shortcut keys pressed while a Browser page (webview) has focus, handed to the shell.
+  native.on('browser:key', (k) => document.dispatchEvent(new KeyboardEvent(k.type, { ...k, bubbles: true, cancelable: true })));
   /** Unwraps an IPC result { ok, value } | { ok: false, error }. */
   const call = async (channel, ...args) => {
     const res = await native.invoke(channel, ...args);

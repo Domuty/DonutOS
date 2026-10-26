@@ -24,9 +24,9 @@ export default function main(ctx) {
   let fe = false;
 
   const navEl = h('nav.calc-nav', { hidden: true, 'aria-label': 'Calculator modes' });
-  const head = h('header.calc-head');
+  const head = h('div.calc-head');
   const main = h('div.calc-main');
-  const side = h('aside.calc-side');
+  const side = h('div.calc-side');
   mount(win.body, head, h('div.calc-wrap', main, side), navEl);
 
   // ── Shared state for the arithmetic modes ────────────────────────────

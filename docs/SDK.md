@@ -401,6 +401,20 @@ The eight apps in the DonutOS Store are real Store apps built only with this SDK
 | Snake, 2048, Typing Test | | keyboard, animation, high scores |
 | Colors | | clipboard and the theme variables |
 
+### Accessibility
+
+Store apps automatically get the user's accessibility settings:
+- **Theme:** contrast themes, a bigger pointer and the thick focus indicator, through the same CSS variables and `data-contrast` / `data-focus-ring` / `data-cursor` attributes on `<html>`.
+- **Narrator** reads what gets focus in your app.
+- **Magnifier** follows the pointer inside it.
+- **The on-screen keyboard** types into it.
+
+To make your app work well with these:
+- Give icon-only buttons an `aria-label`, and label every input (`<label>` or `aria-label`).
+- Use real `<button>`s and links rather than clickable `<div>`s.
+- Don't remove focus outlines.
+- Use the theme variables rather than fixed colours, so contrast themes apply.
+
 ---
 
 ## 10. Limits and tips

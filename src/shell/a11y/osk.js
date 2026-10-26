@@ -42,6 +42,10 @@ export class OnScreenKeyboard {
 
   get open() { return !!this.el; }
 
+  // Where typing goes: clicking a key can move focus off a web page or app frame (they're
+  // separate documents), so the last thing that had focus is remembered.
+  #track = (e) => { if (!this.el?.contains(e.target) && e.target !== document.body) this.lastTarget = e.target; };
+
   show() {
     if (this.el) return;
     this.el = h('div.osk', { role: 'group', 'aria-label': 'On-screen keyboard', class: this.getTop() && 'top' },
@@ -53,10 +57,13 @@ export class OnScreenKeyboard {
     this.el.addEventListener('pointerdown', (e) => { e.preventDefault(); });
     this.el.addEventListener('mousedown', (e) => e.preventDefault());
     document.body.append(this.el);
+    document.addEventListener('focusin', this.#track, true);
+    this.lastTarget = document.activeElement !== document.body ? document.activeElement : null;
     this.paint();
   }
 
   hide() {
+    document.removeEventListener('focusin', this.#track, true);
     this.stopRepeat();
     this.el?.remove();
     this.el = null;
@@ -113,6 +120,10 @@ export class OnScreenKeyboard {
 
   send(key, code, mods, metaAlone = false) {
     let target = document.activeElement || document.body;
+    if ((target === document.body || target === document.documentElement || this.el?.contains(target)) && this.lastTarget?.isConnected) {
+      target = this.lastTarget;
+      target.focus?.({ preventScroll: true });
+    }
     // A Store app's frame or a desktop Browser page has focus: hand the key over.
     if (target.tagName === 'IFRAME' && target.classList.contains('sandbox-frame')) { a11yChannel.emit('key', { frame: target, key, code, mods }); return; }
     if (target.tagName === 'WEBVIEW') { this.sendToWebview?.(target, { key, code, mods }); return; }
