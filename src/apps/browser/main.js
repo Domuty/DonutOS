@@ -10,12 +10,13 @@ import { promptDialog, confirmDialog, alertDialog } from '../../ui/dialog.js';
 import { formatBytes } from '../../core/util.js';
 import * as P from '../../core/path.js';
 
-// Google's igu=1 mode allows its results to be shown inside other pages (useful on the web
-// version without a relay).
-const DEFAULT_ENGINE = 'duckduckgo';
+// Google's igu=1 mode allows its results to be shown inside other pages. On the web version
+// Google searches load straight from the user's own browser (search engines block requests from
+// servers, like the relay's), unless Browser settings send Google through the relay.
+const DEFAULT_ENGINE = 'google';
 const ENGINES = {
-  duckduckgo: ['DuckDuckGo', 'https://duckduckgo.com/?q='],
   google: ['Google', 'https://www.google.com/search?igu=1&q='],
+  duckduckgo: ['DuckDuckGo', 'https://duckduckgo.com/?q='],
   bing: ['Bing', 'https://www.bing.com/search?q='],
   startpage: ['Startpage', 'https://www.startpage.com/do/search?q='],
   wikipedia: ['Wikipedia', 'https://en.wikipedia.org/w/index.php?search='],
@@ -172,9 +173,11 @@ export default function main(ctx) {
     // Web version: pages come through DonutOS's relay when the host has one (so sites that
     // refuse to be framed still show, and links inside them keep working). Without a relay,
     // sites that refuse get a page of ours instead of an empty frame.
-    const relay = store.get('relay', true) && await B.relayAvailable().catch(() => false);
+    const isGoogle = /^https:\/\/www\.google\.com\/(search|webhp)\b[^#]*[?&]igu=1/.test(url);
+    const relay = store.get('relay', true) && !(isGoogle && store.get('googleVia', 'direct') === 'direct') && await B.relayAvailable().catch(() => false);
     if (relay && url.startsWith(ENGINES.duckduckgo[1])) { url = `https://html.duckduckgo.com/html/?q=${url.slice(ENGINES.duckduckgo[1].length)}`; tab.url = url; }
-    const embeddable = relay ? true : await B.canEmbed(url).catch(() => null);
+    // Google's embeddable mode allows frames, so it needs no check.
+    const embeddable = relay || isGoogle ? true : await B.canEmbed(url).catch(() => null);
     if (tab.navSeq !== seq) return; // the user went somewhere else meanwhile
     tab.loading = false;
     if (embeddable === false) { showBlocked(tab, url); return; }
@@ -404,6 +407,8 @@ export default function main(ctx) {
     const home = h('input.input', { value: store.get('home', 'about:newtab'), 'aria-label': 'Home page', onchange: (e) => store.set('home', e.target.value.trim() || 'about:newtab') });
     const bar = h('input', { type: 'checkbox', checked: store.get('showBookmarks', true), onchange: (e) => { store.set('showBookmarks', e.target.checked); renderChrome(); } });
     const relayBox = h('input', { type: 'checkbox', checked: store.get('relay', true), onchange: (e) => { store.set('relay', e.target.checked); relayOn = e.target.checked && relayHere; } });
+    const googleVia = h('select.input', { 'aria-label': 'Google searches', onchange: (e) => store.set('googleVia', e.target.value) },
+      [['direct', 'Directly from this browser (recommended)'], ['relay', 'Through the relay']].map(([v, l]) => h('option', { value: v, selected: store.get('googleVia', 'direct') === v }, l)));
     const zoom = h('select.input', { 'aria-label': 'Default zoom', onchange: (e) => store.set('zoom', Number(e.target.value)) }, [0.75, 0.9, 1, 1.1, 1.25, 1.5].map((z) => h('option', { value: z, selected: store.get('zoom', 1) === z }, `${Math.round(z * 100)}%`)));
     return h('div.br-page.br-settings', h('h1', 'Browser settings'),
       h('label.ck-field', 'Search engine used in the address bar', sel),
@@ -411,7 +416,9 @@ export default function main(ctx) {
       h('label.ck-field', 'Default page zoom', zoom),
       h('label.wr-check', bar, 'Show the bookmarks bar'),
       relayHere ? [h('label.wr-check', relayBox, 'Show websites through DonutOS’s relay'),
-        h('p.hint', 'Lets sites that don’t allow being shown inside other apps open in this window, and keeps links inside them working. Pages come through the server DonutOS is hosted on; they can’t sign you in (no cookies are kept), and some video and interactive sites may not work. Turn this off to show sites directly where they allow it.')] : null,
+        h('p.hint', 'Lets sites that don’t allow being shown inside other apps open in this window, and keeps links inside them working. Pages come through the server DonutOS is hosted on; they can’t sign you in (no cookies are kept), and some video and interactive sites may not work. Turn this off to show sites directly where they allow it.'),
+        h('label.ck-field', 'Google searches', googleVia),
+        h('p.hint', 'Directly: results always load (Google doesn’t block your own browser), but a result that doesn’t allow being shown inside other apps says “refused to connect”; use ⋯ › Open in my computer’s browser for those. Through the relay: result links keep working, but Google often blocks the relay’s server with a robot check.')] : null,
       h('h3', 'Clear browsing data'),
       h('div.wr-row',
         h('button.btn', { type: 'button', onclick: () => { store.set('history', []); } }, 'Clear history'),
