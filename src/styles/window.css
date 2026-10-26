@@ -31,7 +31,7 @@
 .win:not(.active) .win-title, .win:not(.active) .win-icon { opacity: .55; }
 .win-tb-slot { flex: 1; min-width: 0; height: 100%; display: flex; align-items: center; }
 .win-controls { flex: none; display: flex; height: 100%; align-self: flex-start; }
-.win-btn { width: 46px; height: 32px; border: 0; background: none; color: var(--text); display: grid; place-items: center; cursor: default; transition: background .1s; }
+.win-btn { width: 46px; height: 32px; border: 0; background: none; color: var(--text); display: grid; place-items: center; cursor: var(--cur-default, default); transition: background .1s; }
 .win-btn:hover { background: var(--hover); }
 .win-btn:active { background: var(--press); }
 .win-close:hover { background: #c42b1c; color: #fff; }
@@ -40,13 +40,13 @@
 .win-body { outline: none; flex: 1; min-height: 0; position: relative; overflow: clip; display: flex; flex-direction: column; }
 
 .rz { position: absolute; z-index: 5; }
-.rz-n, .rz-s { left: 8px; right: 8px; height: 6px; cursor: ns-resize; }
+.rz-n, .rz-s { left: 8px; right: 8px; height: 6px; cursor: var(--cur-ns, ns-resize); }
 .rz-n { top: -2px; } .rz-s { bottom: -2px; }
-.rz-e, .rz-w { top: 8px; bottom: 8px; width: 6px; cursor: ew-resize; }
+.rz-e, .rz-w { top: 8px; bottom: 8px; width: 6px; cursor: var(--cur-ew, ew-resize); }
 .rz-e { right: -2px; } .rz-w { left: -2px; }
 .rz-ne, .rz-nw, .rz-se, .rz-sw { width: 12px; height: 12px; }
-.rz-ne { right: -2px; top: -2px; cursor: nesw-resize; } .rz-sw { left: -2px; bottom: -2px; cursor: nesw-resize; }
-.rz-nw { left: -2px; top: -2px; cursor: nwse-resize; } .rz-se { right: -2px; bottom: -2px; cursor: nwse-resize; }
+.rz-ne { right: -2px; top: -2px; cursor: var(--cur-nesw, nesw-resize); } .rz-sw { left: -2px; bottom: -2px; cursor: var(--cur-nesw, nesw-resize); }
+.rz-nw { left: -2px; top: -2px; cursor: var(--cur-nwse, nwse-resize); } .rz-se { right: -2px; bottom: -2px; cursor: var(--cur-nwse, nwse-resize); }
 .win.maximized .rz { display: none; }
 
 .win-snapshot { border-radius: 4px; box-shadow: 0 0 0 1px var(--border); }

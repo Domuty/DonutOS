@@ -163,9 +163,10 @@ export default function main(ctx) {
     if (cur) return h(cls.replace('.primary', ''), { type: 'button', onclick: (e) => { e.stopPropagation(); k.launch(a.id).catch((err) => alertDialog('Couldn’t open', err.message, { parent: win.body })); } }, 'Open');
     return h(cls, { type: 'button', onclick: (e) => { e.stopPropagation(); installEntry(a); } }, 'Install');
   }
-  const card = (a) => h('div.st-card', { role: 'button', tabindex: '0', onclick: () => show({ name: 'app', id: a.id }), onkeydown: (e) => { if (e.key === 'Enter') show({ name: 'app', id: a.id }); } },
+  // The app's name is the card's link (its click area covers the card); Install/Open sit above it.
+  const card = (a) => h('div.st-card',
     h('img', { src: a.icon, alt: '', width: 56, height: 56 }),
-    h('div.st-cardtext', h('b', a.name), h('small', a.category), h('p', a.summary || a.description)),
+    h('div.st-cardtext', h('button.st-cardlink', { type: 'button', 'aria-label': `${a.name}, ${a.category}`, onclick: () => show({ name: 'app', id: a.id }) }, a.name), h('small', a.category), h('p', a.summary || a.description)),
     h('div.st-cardfoot', installed(a.id) ? h('small.st-ok', icon('check', { size: 12 }), updateFor(a) ? 'Update available' : 'Installed') : h('small', a.author), actionButton(a)));
 
   // ── Pages ────────────────────────────────────────────────────────────

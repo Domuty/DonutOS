@@ -40,7 +40,7 @@ export default function main(ctx) {
   let pageView = store.get('pageView', true);
   let spell = store.get('spell', true);
 
-  const page = h('div.wr-page', { contenteditable: 'true', spellcheck: String(spell), role: 'textbox', 'aria-multiline': 'true', 'aria-label': 'Document' });
+  const page = h('div.wr-page', { contenteditable: 'true', tabindex: '0', spellcheck: String(spell), role: 'textbox', 'aria-multiline': 'true', 'aria-label': 'Document' });
   const scroller = h('div.wr-scroll', h('div.wr-zoom', page));
   const status = h('footer.wr-status');
   const tb = h('div.wr-toolbar', { role: 'toolbar', 'aria-label': 'Formatting' });

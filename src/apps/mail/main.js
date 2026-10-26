@@ -69,7 +69,7 @@ export default function main(ctx) {
 
   function renderList() {
     const search = h('input.input', { type: 'search', placeholder: 'Search mail', value: query, 'aria-label': 'Search mail', oninput: (e) => { query = e.target.value.trim().toLowerCase(); paint(); } });
-    const items = h('div.ml-items', { role: 'listbox', tabindex: '0', onkeydown: (e) => {
+    const items = h('div.ml-items', { role: 'listbox', 'aria-label': 'Messages', tabindex: '0', onkeydown: (e) => {
       const shown = filtered();
       const i = shown.findIndex((m) => m.id === selectedId);
       if (e.key === 'ArrowDown' || e.key === 'ArrowUp') { e.preventDefault(); const n = shown[Math.max(0, Math.min(shown.length - 1, i + (e.key === 'ArrowDown' ? 1 : -1)))]; if (n) select(n.id); }
@@ -79,6 +79,8 @@ export default function main(ctx) {
     const filtered = () => messages.filter((m) => !query || `${m.subject} ${m.from?.name} ${m.from?.address} ${(m.to || []).join(' ')} ${m.text || htmlToText(m.html)}`.toLowerCase().includes(query));
     const paint = () => {
       const shown = filtered();
+      // A list box only while there are messages to choose from.
+      items.setAttribute('role', shown.length ? 'listbox' : 'group');
       mount(items, shown.length ? shown.map((m) => h('div.ml-item', { role: 'option', 'aria-selected': String(m.id === selectedId), class: [!m.read && 'unread', m.flagged && 'flagged'], draggable: 'true',
         onclick: () => (folder === 'drafts' ? compose({ draft: m }) : select(m.id)),
         ondragstart: (e) => e.dataTransfer.setData('application/x-donut-mail', m.id),

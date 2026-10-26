@@ -20,10 +20,11 @@
   --input-border: rgba(255, 255, 255, 0.12);
   --text: #f4eff7;
   --text-2: rgba(244, 239, 247, 0.7);
-  --text-3: rgba(244, 239, 247, 0.46);
+  --text-3: rgba(244, 239, 247, 0.58);
   --ok: #6fdc8c;
   --warn: #ffcf5c;
   --danger: #ff6b6b;
+  --danger-fill: #c42b1c; /* filled danger buttons: white text at 5.7:1 */
   --radius-s: 4px;
   --radius: 8px;
   --radius-l: 12px;
@@ -55,7 +56,7 @@
   --input-border: rgba(0, 0, 0, 0.13);
   --text: #1c1a20;
   --text-2: rgba(28, 26, 32, 0.7);
-  --text-3: rgba(28, 26, 32, 0.48);
+  --text-3: rgba(28, 26, 32, 0.65);
   --ok: #1f9a4a;
   --warn: #b07800;
   --danger: #c93636;

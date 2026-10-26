@@ -55,6 +55,7 @@ donutos/
 ├── package.json                 ✅ scripts, Electron + electron-builder config, GitHub publish
 ├── vercel.json                  ✅ static deploy of /src, SW headers, precache build step
 ├── api/frame-check.js           ✅ Vercel function: can the Browser show a site in a frame? (logic in api/_lib/)
+├── api/relay.js                 ✅ Vercel function: the Browser's relay for sites that refuse frames (api/_lib/relay.js)
 ├── README.md                    ✅ (rewritten for beginners in phase 9)
 ├── docs/
 │   ├── ARCHITECTURE.md          ✅ this file
@@ -373,12 +374,19 @@ focus is a timed do-not-disturb.
   HTML/SVG files open with an opaque origin so they can never reach DonutOS.
   The web build can't read cross-origin frames: titles show the site name, Back/Forward cover
   pages opened from DonutOS, and Find/Print use the host browser.
-  - **Sites that forbid framing.** Most big sites (X-Frame-Options / CSP `frame-ancestors`) would leave an empty frame. Before loading a page, the Browser calls `ctx.browser.canEmbed(url)`.
+  - **Relay (web).** When the host has `api/relay` (Vercel, `scripts/serve.js`) and Browser › Settings allows it, every page goes through the relay (`api/_lib/relay.js`).
+    - The relay fetches the page server-side, drops X-Frame-Options/CSP/cookies and follows redirects.
+    - For HTML it adds `<base href>` (subresources load from the site directly) and a script that routes link clicks and form submissions back through the relay and posts `{donutRelay:'loaded'|'open'}` to the Browser.
+    - The Browser's relay view (`platform/common/web-view.js › relayView`) keeps the real URLs for the address bar, title and Back/Forward.
+    - Safety: responses carry `Content-Security-Policy: sandbox` without allow-same-origin, and the frame has no allow-same-origin, so relayed pages can't reach DonutOS's storage.
+    - Requests without `Sec-Fetch-Dest: iframe` are refused, so it isn't an open proxy in a browser tab, and private network addresses are refused.
+    - It can't help with logins (no cookies), JavaScript-driven navigation (`location = …`) or sites that block servers.
+  - **Sites that forbid framing (no relay).** Most big sites (X-Frame-Options / CSP `frame-ancestors`) would leave an empty frame. Before loading a page, the Browser calls `ctx.browser.canEmbed(url)`.
     - On the web this asks `api/frame-check` (a Vercel function; `scripts/serve.js` answers locally). It requests the page server-side, reads only its headers, and replies true/false/null.
     - The check refuses private and loopback addresses, follows at most 5 redirects, and never passes page content back.
     - `false` shows a "*site* opens in its own tab" page with **Open in a new tab**. `null` (static hosts without the function, or offline) just tries the frame.
     - Links clicked inside a framed page can't be checked, so a notice covers those.
-    - The default search engine is Google in its embeddable mode (`igu=1`), so searches stay in the window.
+    - Google search uses its embeddable mode (`igu=1`); with the relay, DuckDuckGo (the default) uses its plain-HTML results page.
     - The desktop build's `<webview>` is a top-level page, so `canEmbed` is always true there.
 - **Mail** (`core/mail.js`): real delivery between this device's accounts (`name@device.local`),
   stored per user in the key-value store so it reaches people who are signed out. Outside

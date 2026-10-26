@@ -30,7 +30,7 @@ export class Taskbar {
     this.searchIcon = h('button.tb-btn', { type: 'button', title: 'Search', 'aria-label': 'Search', onclick: () => session.flyouts.toggle('search') }, svgSearch());
     this.taskViewBtn = h('button.tb-btn', { type: 'button', title: 'Task view', 'aria-label': 'Task view', 'aria-pressed': 'false', onclick: () => session.taskView.toggle() }, taskViewIcon());
     this.weatherBtn = h('button.tb-weather', { type: 'button', title: 'Widgets', 'aria-label': 'Widgets', 'aria-expanded': 'false', onclick: () => session.flyouts.toggle('widgets') });
-    this.appsEl = h('div.tb-apps', { role: 'list' });
+    this.appsEl = h('div.tb-apps', { role: 'group', 'aria-label': 'Apps' });
     this.center = h('div.tb-center', this.startBtn, this.searchBox, this.searchIcon, this.taskViewBtn, this.appsEl);
     this.left = h('div.tb-left');
     this.trayBtn = h('button.tb-tray', { type: 'button', 'aria-label': 'Quick settings', 'aria-expanded': 'false', onclick: () => session.flyouts.toggle('qs') });
@@ -148,7 +148,7 @@ export class Taskbar {
     const isActive = windows.some((w) => w === active && w.state !== 'minimized');
     const progress = windows.find((w) => typeof w.progress === 'number')?.progress;
     const btn = h('button.tb-btn.tb-app', {
-      type: 'button', role: 'listitem', draggable: item.pinned ? 'true' : 'false',
+      type: 'button', draggable: item.pinned ? 'true' : 'false',
       class: [running && 'running', isActive && 'active', windows.some((w) => w.flashing) && 'flash', label && 'labelled'],
       title: windows.length === 1 ? windows[0].title : item.app.name,
       'aria-label': `${item.app.name}${running ? `, ${windows.length} window${windows.length > 1 ? 's' : ''} open` : ''}`,

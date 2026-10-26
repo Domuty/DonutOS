@@ -16,7 +16,7 @@
 .boot-error p { color: rgba(255,255,255,.7); margin: 6px 0 16px; }
 
 /* ── Lock screen ──────────────────────────────────────────────────── */
-.lock { color: #fff; transition: transform .5s var(--ease-out); will-change: transform; touch-action: none; cursor: default; z-index: 2; }
+.lock { color: #fff; transition: transform .5s var(--ease-out); will-change: transform; touch-action: none; cursor: var(--cur-default, default); z-index: 2; }
 .lock.dragging { transition: none; }
 .lock.leaving { transform: translateY(-100%); transition: transform .42s cubic-bezier(.5, 0, .3, 1); }
 .lock.entering { animation: lock-in .45s var(--ease-out); }
@@ -44,7 +44,7 @@
 .cred:focus-within { background: rgba(255,255,255,.95); color: #1c1a20; border-bottom-color: var(--accent); }
 .cred input { flex: 1; min-width: 0; border: 0; background: none; padding: 0 12px; color: inherit; font-size: 15px; letter-spacing: .02em; }
 .cred input::placeholder { color: currentColor; opacity: .7; }
-.cred button { width: 36px; border: 0; background: none; color: inherit; display: grid; place-items: center; cursor: default; }
+.cred button { width: 36px; border: 0; background: none; color: inherit; display: grid; place-items: center; cursor: var(--cur-default, default); }
 .cred button:hover { background: rgba(127,127,127,.18); }
 .cred .go { background: var(--accent); color: var(--accent-contrast); }
 .cred .go:hover { background: var(--accent-hover); }
@@ -54,7 +54,7 @@
 .signin-msg { font-size: 13.5px; line-height: 1.5; min-height: 20px; text-shadow: 0 1px 6px rgba(0,0,0,.35); }
 .signin-msg.error { color: #fff; }
 .signin-links { display: grid; gap: 8px; justify-items: center; font-size: 13.5px; }
-.signin-links button { color: #fff; opacity: .9; background: none; border: 0; padding: 2px 4px; cursor: default; }
+.signin-links button { color: #fff; opacity: .9; background: none; border: 0; padding: 2px 4px; cursor: var(--cur-default, default); }
 .signin-links button:hover { text-decoration: underline; opacity: 1; }
 .signin-options { display: flex; gap: 8px; justify-content: center; }
 .signin-options button { width: 40px; height: 40px; border-radius: var(--radius-s); border: 1px solid rgba(255,255,255,.25); background: rgba(255,255,255,.1); color: #fff; display: grid; place-items: center; }
@@ -62,7 +62,7 @@
 .signin-hint { font-size: 13px; padding: 10px 12px; border-radius: var(--radius); background: rgba(0,0,0,.28); max-width: 296px; line-height: 1.5; text-align: left; }
 .busy-dots { --s: 28px; color: #fff; margin: 6px auto; }
 .signin-users { position: absolute; left: 16px; bottom: 16px; display: grid; gap: 2px; max-height: 50vh; overflow: auto; padding-right: 6px; }
-.signin-users button { display: flex; align-items: center; gap: 12px; padding: 8px 14px 8px 8px; min-width: 220px; border: 0; border-radius: var(--radius-s); background: none; color: #fff; text-align: left; cursor: default; text-shadow: 0 1px 8px rgba(0,0,0,.35); }
+.signin-users button { display: flex; align-items: center; gap: 12px; padding: 8px 14px 8px 8px; min-width: 220px; border: 0; border-radius: var(--radius-s); background: none; color: #fff; text-align: left; cursor: var(--cur-default, default); text-shadow: 0 1px 8px rgba(0,0,0,.35); }
 .signin-users button:hover { background: rgba(255,255,255,.12); }
 .signin-users button[aria-current="true"] { background: rgba(255,255,255,.2); }
 .signin-users small { display: block; font-size: 11.5px; opacity: .75; }
@@ -109,7 +109,7 @@
 .sleep-screen { background: #000; z-index: 60; cursor: none; opacity: 0; transition: opacity .8s ease; }
 .sleep-screen.on { opacity: 1; }
 .off-screen { background: #000; color: rgba(255,255,255,.7); z-index: 70; display: grid; place-items: center; align-content: center; gap: 22px; text-align: center; }
-.off-screen button { width: 64px; height: 64px; border-radius: 50%; border: 1px solid rgba(255,255,255,.25); background: rgba(255,255,255,.06); color: #fff; display: grid; place-items: center; cursor: default; }
+.off-screen button { width: 64px; height: 64px; border-radius: 50%; border: 1px solid rgba(255,255,255,.25); background: rgba(255,255,255,.06); color: #fff; display: grid; place-items: center; cursor: var(--cur-default, default); }
 .off-screen button:hover { background: rgba(255,255,255,.14); }
 
 /* ── Session ────────────────────────────────────────────────────── */
@@ -128,7 +128,7 @@
 .section-title { font-size: 14px; font-weight: 600; margin: 14px 0 6px; }
 .section-title:first-child { margin-top: 0; }
 .me { display: flex; align-items: center; gap: 18px; margin-bottom: 8px; }
-.me h3 { margin: 0; font: 600 20px/1.3 var(--font-display); }
+.me h2, .me h3 { margin: 0; font: 600 20px/1.3 var(--font-display); }
 .me p { margin: 2px 0 0; color: var(--text-2); font-size: 13px; }
 
 @media (max-width: 720px) {

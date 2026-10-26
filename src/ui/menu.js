@@ -4,6 +4,7 @@
 
 import { h } from './h.js';
 import { icon as makeIcon } from './icons.js';
+import { screenZoom, screenToPage, visiblePage } from './screen.js';
 
 let open = null;
 
@@ -22,16 +23,24 @@ export function showMenu(items, { x, y, anchor, placement = 'below', align = 'ce
   h('span', { style: { flex: 1 } }, it.label), it.hint ? h('span.menu-hint', it.hint) : null)));
   parent.append(menu);
 
-  const r = menu.getBoundingClientRect();
-  let left = x, top = y;
+  // Sizes and positions in page coordinates (they differ from the screen's while Magnifier zooms).
+  const z = screenZoom();
+  const sr = menu.getBoundingClientRect();
+  const r = { width: sr.width / z, height: sr.height / z };
+  // x, y are pointer positions on the screen (clientX / clientY).
+  let { x: left, y: top } = screenToPage(x ?? 0, y ?? 0);
   if (anchor) {
-    const a = anchor.getBoundingClientRect();
+    const ar = anchor.getBoundingClientRect();
+    const tl = screenToPage(ar.left, ar.top), br = screenToPage(ar.right, ar.bottom);
+    const a = { left: tl.x, top: tl.y, width: br.x - tl.x, bottom: br.y };
     left = align === 'start' ? a.left : a.left + a.width / 2 - r.width / 2;
     top = placement === 'above' ? a.top - r.height - 8 : a.bottom + (align === 'start' ? 2 : 8);
     if (placement === 'above') menu.classList.add('up');
   }
-  left = Math.max(8, Math.min(left, innerWidth - r.width - 8));
-  top = Math.max(8, Math.min(top, innerHeight - r.height - 8));
+  const vis = visiblePage();
+  const m = 8 / z;
+  left = Math.max(vis.left + m, Math.min(left, vis.right - r.width - m));
+  top = Math.max(vis.top + m, Math.min(top, vis.bottom - r.height - m));
   Object.assign(menu.style, { left: `${left}px`, top: `${top}px` });
 
   const onDown = (e) => { if (!menu.contains(e.target) && !anchor?.contains(e.target)) close(); };

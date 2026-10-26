@@ -8,6 +8,7 @@
 import { h, mount } from '../ui/h.js';
 import { icon, batteryIcon } from '../ui/icons.js';
 import { launchApp } from './apps.js';
+import { QUICK_FEATURES } from './a11y/prefs.js';
 
 export class QuickSettings {
   constructor(session) {
@@ -17,7 +18,7 @@ export class QuickSettings {
     this.detail = null;
     this.btAvailable = null;
     this.f = session.flyouts.add('qs', { className: 'fly-qs', label: 'Quick settings', onOpen: () => { this.detail = null; this.render(); } });
-    this.offs = [this.settings.watch('qs.*', () => this.isOpen() && this.render()), this.settings.watch('appearance.theme', () => this.isOpen() && this.render())];
+    this.offs = [this.settings.watch('qs.*', () => this.isOpen() && this.render()), this.settings.watch('appearance.theme', () => this.isOpen() && this.render()), this.settings.watch('a11y.*', () => this.isOpen() && this.render())];
     navigator.bluetooth?.getAvailability?.().then((a) => { this.btAvailable = a; }).catch(() => { this.btAvailable = false; });
   }
 
@@ -34,6 +35,7 @@ export class QuickSettings {
     const s = this.settings;
     const [net, bat] = await Promise.all([this.kernel.platform.system.network(), this.kernel.platform.system.battery()]);
     if (this.detail === 'network') return this.renderNetwork(net);
+    if (this.detail === 'a11y') return this.renderA11y();
     const air = s.get('qs.airplane');
     const wifi = s.get('qs.wifi') && !air;
     const bt = s.get('qs.bluetooth') && !air;
@@ -50,6 +52,11 @@ export class QuickSettings {
       this.tile({ label: 'Dark mode', ic: icon('moon', { size: 18 }), on: dark, onClick: () => s.set('appearance.theme', dark ? 'light' : 'dark') }),
       this.tile({ label: 'Night light', ic: icon('sun', { size: 18 }), on: s.get('qs.nightLight'), onClick: () => s.set('qs.nightLight', !s.get('qs.nightLight')), onMore: () => { this.s.flyouts.close(); launchApp(this.kernel, 'settings', { page: 'display' }); } }),
       this.tile({ label: 'Focus', sub: focus ? `${left} min left` : `${s.get('qs.focusMinutes')} min`, ic: focusIcon(), on: focus, onClick: () => this.s.shell.toggleFocus() }),
+      (() => {
+        const on = QUICK_FEATURES.filter(([k]) => s.get(`a11y.${k}`));
+        const open = () => { this.detail = 'a11y'; this.render(); };
+        return this.tile({ label: 'Accessibility', sub: on.length ? (on.length === 1 ? on[0][1] : `${on.length} on`) : 'Off', ic: icon('accessibility', { size: 18 }), on: on.length > 0, onClick: open, onMore: open });
+      })(),
     ];
     const bright = s.get('qs.brightness');
     const vol = s.get('qs.volume');
@@ -63,6 +70,15 @@ export class QuickSettings {
       h('div.qs-foot',
         realBattery ? h('span.qs-bat', batteryIcon(bat.level, bat.charging, { size: 18 }), `${Math.round(bat.level * 100)}%${bat.charging ? ' · charging' : ''}`) : h('span'),
         h('button.tb-btn', { type: 'button', title: 'All settings', 'aria-label': 'All settings', onclick: () => { this.s.flyouts.close(); launchApp(this.kernel, 'settings', { page: 'system' }); } }, icon('settings', { size: 18 }))));
+  }
+
+  renderA11y() {
+    const s = this.settings;
+    mount(this.f.el,
+      h('div.qs-detail-head', h('button.tb-btn', { type: 'button', 'aria-label': 'Back', onclick: () => { this.detail = null; this.render(); } }, icon('arrowLeft', { size: 16 })), h('b', 'Accessibility')),
+      h('div.qs-net', QUICK_FEATURES.map(([key, label, ic]) => h('div.row', icon(ic), h('div.grow', h('div.t', label)),
+        h('label.toggle', h('input', { type: 'checkbox', checked: s.get(`a11y.${key}`), 'aria-label': label, onchange: (e) => s.set(`a11y.${key}`, e.target.checked) }), h('span')))),
+      h('button.link', { type: 'button', style: { margin: '10px 4px 14px' }, onclick: () => { this.s.flyouts.close(); launchApp(this.kernel, 'settings', { page: 'accessibility' }); } }, 'More accessibility settings')));
   }
 
   renderNetwork(net) {

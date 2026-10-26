@@ -1,6 +1,7 @@
 // Notepad: plain-text editor with tabs, find & replace, go to line, word wrap, zoom,
 // font choice, and a status bar (line/column, characters, line endings, encoding).
 
+import { createTabStrip, renderTabStrip, tabCloser } from '../common/tabs.js';
 import { h, mount } from '../../ui/h.js';
 import { icon } from '../../ui/icons.js';
 import { menubar } from '../../ui/menubar.js';
@@ -26,7 +27,7 @@ export default function main(ctx) {
   let font = store.get('font', 'mono');
   let fontSize = store.get('fontSize', 14);
 
-  const tabStrip = h('div.ex-tabs.drag', { role: 'tablist', 'aria-label': 'Notepad tabs' });
+  const tabStrip = createTabStrip('Notepad tabs');
   win.titlebar.append(tabStrip);
   const stage = h('div.np-stage');
   const findBar = h('div.np-find', { hidden: true });
@@ -126,11 +127,11 @@ export default function main(ctx) {
   }
 
   function renderTabs() {
-    mount(tabStrip, tabs.map((t) => h('div.ex-tab', {
+    renderTabStrip(tabStrip, tabs.map((t) => h('div.ex-tab', {
       role: 'tab', tabindex: '0', 'aria-selected': String(t === active), class: t === active && 'active', title: t.doc?.path || t.doc?.name,
       onclick: () => activate(t), onauxclick: (e) => { if (e.button === 1) closeTab(t); },
     }, h('span', `${t.doc?.dirty ? '• ' : ''}${t.doc?.name || 'Untitled.txt'}`),
-    h('button.ex-tab-x', { type: 'button', 'aria-label': 'Close tab', onclick: (e) => { e.stopPropagation(); closeTab(t); } }, icon('close', { size: 10 })))),
+    tabCloser('Close tab', () => closeTab(t)))),
     h('button.ex-tab-new', { type: 'button', title: 'New tab (Ctrl+N)', 'aria-label': 'New tab', onclick: () => newTab() }, icon('plus', { size: 14 })));
   }
 

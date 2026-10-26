@@ -88,6 +88,8 @@ export const ADAPTER_SHAPE = {
     cancelDownload: 'function',   // async (id) => void
     onOpenRequest: 'function',    // (cb({ url })) => unsubscribe   (a page asked for a new window)
     clearData: 'function',        // async ({ cache, cookies, storage }) => void
+    sendKey: 'function',          // async (webContentsId, { key, mods }) => void  (on-screen keyboard into a page)
+    relayAvailable: 'function',   // async () => boolean  (web: the host's api/relay; createView({ relay: true }) uses it)
     canEmbed: 'function',         // async (url) => true | false | null  (false: the site refuses to be shown in a frame)
   },
 

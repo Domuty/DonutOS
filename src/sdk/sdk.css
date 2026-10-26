@@ -17,13 +17,13 @@ hr { border: 0; border-top: 1px solid var(--border); margin: 12px 0; }
 ::-webkit-scrollbar { width: 10px; height: 10px; }
 ::-webkit-scrollbar-thumb { background: color-mix(in srgb, var(--text) 25%, transparent); border-radius: 5px; border: 3px solid transparent; background-clip: padding-box; }
 
-.btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 32px; padding: 5px 14px; border-radius: var(--radius-s, 4px); border: 1px solid var(--border); border-bottom-color: var(--border-strong); background: var(--surface-2); color: var(--text); cursor: default; white-space: nowrap; transition: background .12s; }
+.btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 32px; padding: 5px 14px; border-radius: var(--radius-s, 4px); border: 1px solid var(--border); border-bottom-color: var(--border-strong); background: var(--surface-2); color: var(--text); cursor: var(--cur-default, default); white-space: nowrap; transition: background .12s; }
 .btn:hover { background: var(--hover); }
 .btn:active { background: var(--press); }
 .btn:disabled { opacity: .45; pointer-events: none; }
 .btn.primary { background: var(--accent); color: var(--accent-contrast); border-color: transparent; }
 .btn.primary:hover { background: var(--accent-hover); }
-.btn.danger { background: var(--danger); color: #fff; border-color: transparent; }
+.btn.danger { background: var(--danger-fill, var(--danger)); color: #fff; border-color: transparent; }
 .btn.subtle { background: transparent; border-color: transparent; }
 .btn.subtle:hover { background: var(--hover); }
 .btn.icon { width: 32px; padding: 0; }
@@ -53,3 +53,15 @@ textarea.input { resize: vertical; min-height: 80px; }
 .list-item:hover { background: var(--hover); }
 .toolbar { display: flex; align-items: center; gap: 6px; padding: 6px 10px; border-bottom: 1px solid var(--border); }
 .empty { display: grid; place-items: center; text-align: center; color: var(--text-2); padding: 40px 20px; }
+
+/* Accessibility (the user's DonutOS settings) */
+:root[data-cursor] body { cursor: var(--cur-default, default); }
+:root[data-cursor] :is(input:not([type="checkbox"], [type="radio"], [type="range"], [type="button"]), textarea, [contenteditable="true"]) { cursor: var(--cur-text, text); }
+:root[data-cursor] a:any-link { cursor: var(--cur-pointer, pointer); }
+:root[data-focus-ring="thick"] :focus-visible, :root[data-contrast] :focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; box-shadow: 0 0 0 6px var(--bg); }
+:root[data-contrast] .btn, :root[data-contrast] .input, :root[data-contrast] .card { border: 1px solid var(--text); }
+:root[data-contrast] .btn:not(.primary):not(.danger) { color: var(--hc-button-text, var(--text)); }
+:root[data-contrast] .btn.primary { background: var(--accent); color: var(--accent-contrast); }
+:root[data-contrast] a { text-decoration: underline; }
+:root[data-scrollbars="always"] ::-webkit-scrollbar { width: 16px; height: 16px; }
+:root[data-scrollbars="always"] ::-webkit-scrollbar-thumb { background: var(--text-2); border-width: 3px; }

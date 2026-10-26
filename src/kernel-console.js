@@ -42,9 +42,9 @@ export function mountKernelConsole(root, kernel) {
           <dt>Uptime</dt><dd data-k="uptime"></dd>
         </dl><p class="kc-note" data-k="diskLabel"></p></section>
         <section><h2>Processes</h2><table><thead><tr><th>PID</th><th>Name</th><th>CPU</th><th>Memory</th></tr></thead><tbody data-k="procs"></tbody></table></section>
-        <section><h2>File system</h2><pre data-k="tree"></pre></section>
+        <section><h2>File system</h2><pre data-k="tree" tabindex="0" aria-label="File system"></pre></section>
         <section><h2>Updates</h2><dl><dt>Status</dt><dd data-k="update"></dd></dl></section>
-        <section><h2>Kernel log</h2><pre data-k="log"></pre></section>
+        <section><h2>Kernel log</h2><pre data-k="log" tabindex="0" aria-label="Kernel log"></pre></section>
       </div>
     </div>`;
 

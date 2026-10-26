@@ -1,5 +1,6 @@
 // File Explorer: browse, organise, search, compress and move files.
 
+import { createTabStrip, renderTabStrip, tabCloser } from '../common/tabs.js';
 import { h, mount } from '../../ui/h.js';
 import { icon } from '../../ui/icons.js';
 import { showMenu } from '../../ui/menu.js';
@@ -49,7 +50,7 @@ export default function main(ctx) {
   };
 
   // ── Layout ───────────────────────────────────────────────────────────
-  const tabStrip = h('div.ex-tabs.drag', { role: 'tablist', 'aria-label': 'Tabs' });
+  const tabStrip = createTabStrip('Tabs');
   win.titlebar.append(tabStrip);
   const cmd = h('div.ex-cmd', { role: 'toolbar', 'aria-label': 'Commands' });
   const backBtn = h('button.tb-btn', { type: 'button', title: 'Back (Alt+Left)', 'aria-label': 'Back', onclick: () => goBack() }, icon('arrowLeft', { size: 16 }));
@@ -98,13 +99,13 @@ export default function main(ctx) {
   }
 
   function renderTabs() {
-    mount(tabStrip, ex.tabs.map((t) => h('div.ex-tab', {
+    renderTabStrip(tabStrip, ex.tabs.map((t) => h('div.ex-tab', {
       role: 'tab', 'aria-selected': String(t === ex.tab), class: t === ex.tab && 'active', tabindex: '0',
       onclick: () => selectTab(t), onauxclick: (e) => { if (e.button === 1) closeTab(t); },
       ondragover: (e) => { if (e.dataTransfer.types.includes(DRAG_TYPE) && t !== ex.tab) { e.preventDefault(); clearTimeout(t.hover); t.hover = setTimeout(() => selectTab(t), 600); } },
       ondragleave: () => clearTimeout(t.hover),
     }, h('img', { src: t.path === HOME || t.path === home ? appIconUrl('explorer') : fileIconUrl('folder'), alt: '' }), h('span', tabTitle(t)),
-      h('button.ex-tab-x', { type: 'button', 'aria-label': `Close ${tabTitle(t)}`, onclick: (e) => { e.stopPropagation(); closeTab(t); } }, icon('close', { size: 10 })))),
+      tabCloser(`Close ${tabTitle(t)}`, () => closeTab(t)))),
     h('button.ex-tab-new', { type: 'button', title: 'New tab (Ctrl+T or Alt+T)', 'aria-label': 'New tab', onclick: () => newTab() }, icon('plus', { size: 14 })));
     win.setTitle(`${tabTitle(ex.tab)} — File Explorer`);
   }
@@ -319,16 +320,18 @@ export default function main(ctx) {
 
   function renderNav() {
     const pins = store.get('pins', []).filter((p) => !HOME_FOLDERS.some((f) => P.join(home, f) === p));
+    // Three trees (home, quick access, places) separated by lines.
+    const tree = (label, ...nodes) => h('div.ex-tree', { role: 'tree', 'aria-label': label }, nodes);
     mount(nav,
-      navNode('Home', null, appIconUrl('explorer'), { special: HOME }),
-      h('div.ex-nav-sep'),
-      HOME_FOLDERS.map((f) => navNode(f, P.join(home, f), fileIconUrl('folder'))),
-      pins.map((p) => navNode(P.basename(p), p, fileIconUrl('folder'))),
-      h('div.ex-nav-sep'),
-      navNode(me.name, home, fileIconUrl('folder')),
-      navNode('Public', '/Users/Public', fileIconUrl('folder')),
-      navNode('This device', '/', iconUrlDevice()),
-      navNode('Recycle Bin', null, appIconUrl('recyclebin'), { special: 'bin' }));
+      tree('Home', navNode('Home', null, appIconUrl('explorer'), { special: HOME })),
+      h('div.ex-nav-sep', { role: 'separator' }),
+      tree('Quick access', HOME_FOLDERS.map((f) => navNode(f, P.join(home, f), fileIconUrl('folder'))), pins.map((p) => navNode(P.basename(p), p, fileIconUrl('folder')))),
+      h('div.ex-nav-sep', { role: 'separator' }),
+      tree('Places',
+        navNode(me.name, home, fileIconUrl('folder')),
+        navNode('Public', '/Users/Public', fileIconUrl('folder')),
+        navNode('This device', '/', iconUrlDevice()),
+        navNode('Recycle Bin', null, appIconUrl('recyclebin'), { special: 'bin' })));
   }
   const refreshNavSoon = debounce(() => renderNav(), 300);
   const iconUrlDevice = () => 'assets/brand/logo.svg';

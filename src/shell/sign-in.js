@@ -10,6 +10,7 @@ import { spinner } from './boot-screen.js';
 import { mountStatusIcons } from './status-icons.js';
 import { prefsFor, lockWallpaperOf } from './prefs.js';
 import { playSound } from './sounds.js';
+import { openAccessibilityMenu } from './a11y/menu.js';
 
 /**
  * opts: { kernel, preselect (uid), initialKey, lockedUid (the session that was locked),
@@ -35,7 +36,9 @@ export async function showSignIn(layer, opts) {
 
   const statusHost = h('span', { style: { display: 'flex', alignItems: 'center', gap: '12px', padding: '0 8px', color: '#fff' } });
   const stopStatus2 = mountStatusIcons(statusHost, kernel.platform);
-  tools.append(statusHost, h('button', { title: 'Power', 'aria-label': 'Power', onclick: (e) => openPower(e.currentTarget) }, icon('power')));
+  tools.append(statusHost,
+    h('button', { title: 'Accessibility', 'aria-label': 'Accessibility', 'aria-haspopup': 'menu', onclick: (e) => openAccessibilityMenu(kernel, e.currentTarget) }, icon('accessibility')),
+    h('button', { title: 'Power', 'aria-label': 'Power', onclick: (e) => openPower(e.currentTarget) }, icon('power')));
 
   function openPower(anchor) {
     showMenu([

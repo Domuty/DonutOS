@@ -149,7 +149,7 @@ export function renderAccounts(container, { kernel, uid, onChanged = () => {} })
     const picBtn = h('button.btn', { type: 'button', onclick: (e) => changePicture(e.currentTarget, me), disabled: me.isGuest }, icon('image', { size: 16 }), 'Change picture');
 
     const rows = [
-      h('div.me', avatar(me, 80), h('div', h('h3', me.name), h('p', `${typeLabel} · ${me.home}`))),
+      h('div.me', avatar(me, 80), h('div', h('h2', me.name), h('p', `${typeLabel} · ${me.home}`))),
     ];
     if (me.isGuest) {
       rows.push(h('div.row', icon('info'), h('div.grow', h('div.t', 'You’re using the guest account'), h('div.d', 'Everything you do here is erased when you sign out.'))));

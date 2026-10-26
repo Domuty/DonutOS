@@ -27,8 +27,13 @@ const SOUNDS = {
   shutdown: [{ f: 783.99, t: 0, d: 1 }, { f: 659.25, t: 0.14, d: 1 }, { f: 523.25, t: 0.28, d: 1.4 }],
 };
 
+const listeners = new Set();
+/** fn(name) whenever DonutOS plays (or would play, if muted) a sound — for visual notifications. */
+export function onSound(fn) { listeners.add(fn); return () => listeners.delete(fn); }
+
 /** Plays a system sound. Alarms (`{ alarm: true }`) ring even when system sounds are off, but not when muted. */
 export function playSound(name, settings, { alarm = false } = {}) {
+  for (const fn of listeners) { try { fn(name); } catch { /* a listener's problem */ } }
   try {
     if (settings) {
       if ((!alarm && !settings.get('sound.enabled')) || settings.get('qs.muted')) return;

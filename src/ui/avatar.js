@@ -1,6 +1,7 @@
 // Account pictures: either an uploaded image or initials on a coloured circle.
 
 import { h } from './h.js';
+import { textOn } from './contrast.js';
 
 export function initials(name) {
   const parts = String(name || '?').trim().split(/\s+/).filter(Boolean);
@@ -18,6 +19,7 @@ export function avatar(account, size = 48) {
     el.innerHTML = `<svg viewBox="0 0 24 24" width="${size * 0.55}" height="${size * 0.55}" fill="none" stroke="#fff" stroke-width="1.6" stroke-linecap="round"><circle cx="12" cy="8" r="4"/><path d="M4.5 20.5a7.5 7.5 0 0 1 15 0"/></svg>`;
   } else {
     el.style.background = a.color || '#e8618c';
+    el.style.color = textOn(a.color || '#e8618c');
     el.textContent = initials(account?.name);
   }
   return el;

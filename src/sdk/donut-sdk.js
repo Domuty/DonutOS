@@ -185,8 +185,46 @@ export let app = null;
 function applyTheme(theme) {
   const root = document.documentElement;
   for (const [k, v] of Object.entries(theme.tokens)) root.style.setProperty(k, v);
+  // Pointer variables only exist when a bigger pointer is chosen; clear them otherwise.
+  for (const k of [...root.style].filter((p) => p.startsWith('--cur-'))) if (!(k in theme.tokens)) root.style.removeProperty(k);
   root.dataset.theme = theme.mode;
   root.style.colorScheme = theme.mode;
+  for (const [attr, v] of [['contrast', theme.contrast], ['focusRing', theme.focusRing], ['scrollbars', theme.scrollbars], ['cursor', theme.cursor]]) {
+    if (v) root.dataset[attr] = v; else delete root.dataset[attr];
+  }
+}
+
+// ── Accessibility: Narrator, Magnifier and the on-screen keyboard reach into the app ──
+let a11y = { pointer: false, narrator: false, echo: 'chars' };
+let describe = null;
+let editActions = null;
+const say = (text, interrupt = true) => { if (text) parent.postMessage({ type: 'say', text, interrupt }, '*'); };
+let pointerFrame = 0, lastPointer = null;
+addEventListener('pointermove', (e) => {
+  if (!a11y.pointer) return;
+  lastPointer = { x: e.clientX, y: e.clientY };
+  if (!pointerFrame) pointerFrame = requestAnimationFrame(() => { pointerFrame = 0; parent.postMessage({ type: 'pointer', ...lastPointer }, '*'); });
+}, { capture: true, passive: true });
+addEventListener('focusin', async (e) => {
+  if (!a11y.narrator) return;
+  describe ||= (await import('@donut/a11y-name')).describe;
+  say(describe(e.target));
+}, true);
+addEventListener('change', async (e) => {
+  if (!a11y.narrator || !['checkbox', 'radio', 'select-one'].includes(e.target.type)) return;
+  describe ||= (await import('@donut/a11y-name')).describe;
+  say(describe(e.target));
+}, true);
+addEventListener('input', (e) => {
+  if (!a11y.narrator || a11y.echo === 'none' || !e.inputType?.startsWith('insert') || e.data == null) return;
+  if (a11y.echo === 'chars') say(e.target.type === 'password' ? 'star' : e.data === ' ' ? 'space' : e.data);
+}, true);
+async function oskKey({ key, code, mods }) {
+  editActions ||= await import('@donut/edit-actions');
+  const target = document.activeElement || document.body;
+  const init = { key, code, ctrlKey: mods.ctrl, altKey: mods.alt, shiftKey: mods.shift, metaKey: mods.meta, bubbles: true, cancelable: true };
+  if (target.dispatchEvent(new KeyboardEvent('keydown', init))) await editActions.performKey(target, { key, mods }).catch(() => {});
+  target.dispatchEvent(new KeyboardEvent('keyup', init));
 }
 
 // Shortcuts that belong to DonutOS (Start, Task View, Alt+Tab…) still work inside the app.
@@ -212,8 +250,13 @@ addEventListener('message', async (e) => {
     let ok = true;
     for (const fn of app?._beforeClose || []) { try { if ((await fn()) === false) { ok = false; break; } } catch { /* a failing handler doesn't block closing */ } }
     parent.postMessage({ type: 'beforeCloseResult', id: m.id, ok }, '*');
+  } else if (m.type === 'a11y') {
+    a11y = { ...a11y, ...m };
+  } else if (m.type === 'oskKey') {
+    oskKey(m);
   } else if (m.type === 'init') {
     applyTheme(m.theme);
+    if (m.a11y) a11y = { ...a11y, ...m.a11y };
     app = makeApp(m);
     try {
       const mod = await import(`data:text/javascript;base64,${m.source}`);

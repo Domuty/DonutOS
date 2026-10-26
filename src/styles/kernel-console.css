@@ -14,7 +14,7 @@
 .kc header .kc-actions { margin-left: auto; display: flex; gap: 8px; flex-wrap: wrap; }
 .kc a.kc-btn, .kc button {
   display: inline-flex; align-items: center; gap: 6px; padding: 7px 14px; border-radius: var(--radius-s);
-  border: 1px solid var(--border); background: var(--surface-2); color: var(--text); text-decoration: none; cursor: pointer;
+  border: 1px solid var(--border); background: var(--surface-2); color: var(--text); text-decoration: none; cursor: var(--cur-pointer, pointer);
 }
 .kc a.kc-btn:hover, .kc button:hover { background: rgba(255,255,255,.1); }
 .kc .kc-primary { background: var(--accent); border-color: transparent; color: var(--accent-contrast); }

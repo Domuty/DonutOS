@@ -21,6 +21,7 @@ export default function main(ctx) {
   const clock = h('div.ms-led');
   const face = h('button.ms-face', { type: 'button', 'aria-label': 'New game (F2)', onclick: () => reset() }, '🙂');
   const grid = h('div.ms-grid', { role: 'grid', tabindex: '0', 'aria-label': 'Minefield' });
+  let cellEls = [];
   const status = h('div.ms-status', { 'aria-live': 'polite' });
   mount(win.body,
     h('header.ms-bar', h('button.btn.subtle', { type: 'button', onclick: (e) => menu(e.currentTarget) }, 'Game ▾'), h('div.mp-grow'), status),
@@ -41,7 +42,9 @@ export default function main(ctx) {
     face.textContent = '🙂';
     grid.style.setProperty('--cols', W);
     grid.style.setProperty('--rows', H);
-    mount(grid, cells.map((c, i) => h('button.ms-cell', { type: 'button', tabindex: '-1', dataset: { i }, 'aria-label': `Row ${Math.floor(i / W) + 1}, column ${(i % W) + 1}, hidden` })));
+    // Rows (display: contents, for screen readers) of cells; cellEls keeps them by index.
+    cellEls = cells.map((c, i) => h('button.ms-cell', { type: 'button', role: 'gridcell', tabindex: '-1', dataset: { i }, 'aria-label': `Row ${Math.floor(i / W) + 1}, column ${(i % W) + 1}, hidden` }));
+    mount(grid, Array.from({ length: H }, (_, r) => h('div.ms-row', { role: 'row' }, cellEls.slice(r * W, r * W + W))));
     status.textContent = `${LEVELS[level]?.[0] || `Custom ${W}×${H}`} · ${M} mines`;
     paint();
     fit();
@@ -98,7 +101,7 @@ export default function main(ctx) {
     for (const j of ns) if (!cells[j].open && cells[j].mark !== 1) { if (cells[j].mine) { lose(j); return; } open(j); }
   }
   function flashNeighbours(ns) {
-    for (const j of ns) if (!cells[j].open && !cells[j].mark) grid.children[j].classList.add('press');
+    for (const j of ns) if (!cells[j].open && !cells[j].mark) cellEls[j].classList.add('press');
     setTimeout(() => grid.querySelectorAll('.press').forEach((e) => e.classList.remove('press')), 160);
   }
 
@@ -142,7 +145,7 @@ export default function main(ctx) {
   }
   function paint() {
     cells.forEach((c, i) => {
-      const el = grid.children[i];
+      const el = cellEls[i];
       el.className = 'ms-cell';
       el.textContent = '';
       if (c.open) {

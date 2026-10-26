@@ -50,10 +50,12 @@ export default function main(ctx) {
       const x = a[sort.key], y = b[sort.key];
       return (typeof x === 'string' ? x.localeCompare(y) : x - y) * sort.dir;
     });
-    const head = (key, label) => h('button.rb-th', { type: 'button', onclick: () => { sort = { key, dir: sort.key === key ? -sort.dir : 1 }; render(); } },
-      label, sort.key === key ? icon(sort.dir > 0 ? 'chevronUp' : 'chevronDown', { size: 12 }) : null);
+    const head = (key, label) => h('div', { role: 'columnheader', 'aria-sort': sort.key === key ? (sort.dir > 0 ? 'ascending' : 'descending') : 'none' },
+      h('button.rb-th', { type: 'button', onclick: () => { sort = { key, dir: sort.key === key ? -sort.dir : 1 }; render(); } },
+        label, sort.key === key ? icon(sort.dir > 0 ? 'chevronUp' : 'chevronDown', { size: 12 }) : null));
+    table.setAttribute('role', sorted.length ? 'grid' : 'group');
     mount(table,
-      h('div.rb-row.rb-head', head('name', 'Name'), head('originalPath', 'Original location'), head('deletedAt', 'Date deleted'), head('size', 'Size')),
+      sorted.length ? h('div.rb-row.rb-head', { role: 'row' }, head('name', 'Name'), head('originalPath', 'Original location'), head('deletedAt', 'Date deleted'), head('size', 'Size')) : null,
       sorted.length ? sorted.map((it) => {
         const entry = { type: it.type, name: it.name, ext: extname(it.name), kind: kindFor(extname(it.name)) };
         return h('div.rb-row', {
@@ -73,10 +75,10 @@ export default function main(ctx) {
             ], { x: e.clientX, y: e.clientY });
           },
         },
-        h('span.rb-name', h('img', { src: iconForEntry(entry), alt: '' }), it.name),
-        h('span', dirname(it.originalPath).replace(home, 'Home')),
-        h('span', new Date(it.deletedAt).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })),
-        h('span', it.type === 'dir' ? `${formatBytes(it.size)} (folder)` : formatBytes(it.size)));
+        h('span.rb-name', { role: 'gridcell' }, h('img', { src: iconForEntry(entry), alt: '' }), it.name),
+        h('span', { role: 'gridcell' }, dirname(it.originalPath).replace(home, 'Home')),
+        h('span', { role: 'gridcell' }, new Date(it.deletedAt).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })),
+        h('span', { role: 'gridcell' }, it.type === 'dir' ? `${formatBytes(it.size)} (folder)` : formatBytes(it.size)));
       }) : h('div.empty-state', icon('trash', { size: 48 }), h('b', 'The Recycle Bin is empty'), h('p', 'Things you delete from your folders and desktop go here until you empty it.')));
     const total = items.reduce((n, i) => n + (i.size || 0), 0);
     mount(status, h('span', `${items.length} item${items.length === 1 ? '' : 's'}`), selected.size ? h('span', `${selected.size} selected`) : null, h('span', formatBytes(total)));

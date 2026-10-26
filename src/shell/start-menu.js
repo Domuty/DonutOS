@@ -63,7 +63,7 @@ export class StartMenu {
 
   home() {
     const pins = pinned(this.kernel, 'start');
-    const grid = h('div.start-pins', { role: 'list' }, pins.map((id) => this.pinTile(id)));
+    const grid = h('div.start-pins', { role: 'group', 'aria-label': 'Pinned apps' }, pins.map((id) => this.pinTile(id)));
     const rec = this.recommended();
     return h('div.start-body',
       h('div.start-head', h('h3', 'Pinned'), h('button.btn.small', { type: 'button', onclick: () => { this.view = 'all'; this.render(); } }, 'All apps', icon('chevronRight', { size: 14 }))),
@@ -77,7 +77,7 @@ export class StartMenu {
   pinTile(id) {
     const app = this.kernel.registry.get(id);
     const tile = h('button.start-app', {
-      type: 'button', role: 'listitem', draggable: 'true', title: app.description || app.name,
+      type: 'button', draggable: 'true', title: app.description || app.name,
       onclick: () => this.launch(id),
       oncontextmenu: (e) => { e.preventDefault(); this.appMenu(app, e, true); },
     }, h('img', { src: app.icon, alt: '', draggable: 'false' }), h('span', app.name));
@@ -123,11 +123,11 @@ export class StartMenu {
       if (!groups.has(key)) groups.set(key, []);
       groups.get(key).push(a);
     }
-    const list = h('div.start-all', { role: 'list' });
+    const list = h('div.start-all', { role: 'group', 'aria-label': 'All apps' });
     for (const [letter, items] of [...groups].sort(([a], [b]) => a.localeCompare(b))) {
       list.append(h('div.start-letter', { id: `start-letter-${letter}` }, letter));
       for (const a of items) {
-        list.append(h('button.start-row', { type: 'button', role: 'listitem', onclick: () => this.launch(a.id), oncontextmenu: (e) => { e.preventDefault(); this.appMenu(a, e, false); } },
+        list.append(h('button.start-row', { type: 'button', onclick: () => this.launch(a.id), oncontextmenu: (e) => { e.preventDefault(); this.appMenu(a, e, false); } },
           h('img', { src: a.icon, alt: '' }), h('span', a.name, a.description ? h('small', a.description) : null)));
       }
     }

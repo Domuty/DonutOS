@@ -7,6 +7,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 
 const { check } = require('../api/_lib/frame-check.js');
+const { handleRelay } = require('../api/_lib/relay.js');
 
 const ROOT = path.join(__dirname, '..', 'src');
 const PORT = Number(process.env.PORT) || 5173;
@@ -21,6 +22,11 @@ http.createServer(async (req, res) => {
   const url = new URL(req.url, 'http://localhost');
   // Same answer as the Vercel function (api/frame-check.js). Requests from this computer may
   // also check local addresses, so pages from your own dev servers work in the Browser.
+  if (url.pathname === '/api/relay') {
+    const local = ['127.0.0.1', '::1', '::ffff:127.0.0.1'].includes(req.socket.remoteAddress);
+    await handleRelay(req, res, { allowPrivate: local }).catch((err) => { if (!res.headersSent) res.writeHead(500).end(err.message); else res.end(); });
+    return;
+  }
   if (url.pathname === '/api/frame-check') {
     const local = ['127.0.0.1', '::1', '::ffff:127.0.0.1'].includes(req.socket.remoteAddress);
     const result = await check(url.searchParams.get('url') || '', url.searchParams.get('origin') || `http://${req.headers.host}`, { allowPrivate: local });

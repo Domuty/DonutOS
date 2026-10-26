@@ -15,6 +15,8 @@ import { labelFor } from '../../core/shortcuts.js';
 import { PERMISSIONS } from '../../core/permissions.js';
 import { HOME_FOLDERS } from '../../core/vfs.js';
 import * as P from '../../core/path.js';
+import { uninstallApp as removeApp } from '../../shell/apps.js';
+import { A11Y_PAGES } from './a11y-pages.js';
 
 const THEMES = [
   { name: 'Glaze', theme: 'dark', accent: '#e8618c', wallpaper: 'builtin:glaze', wallpaperFit: 'fill', transparency: true, font: 'system' },
@@ -30,10 +32,7 @@ const THEMES = [
 async function uninstallApp(k, s, a) {
   if (!(await confirmDialog(`Uninstall ${a.name}?`, 'This app and its settings will be removed. Your files stay where they are.', { ok: 'Uninstall', danger: true }))) return false;
   try {
-    for (const p of k.processes.byApp(a.id)) await k.processes.kill(p.pid, { force: true });
-    await k.registry.uninstall(a.id);
-    s.resetPrefix(`app.${a.id}.`);
-    for (const where of ['start.pinned', 'taskbar.pinned']) s.set(where, s.get(where).filter((x) => x !== a.id));
+    await removeApp(k, a.id, s.uid);
     return true;
   } catch (err) { alertDialog('Couldn’t uninstall', err.message); return false; }
 }
@@ -41,7 +40,7 @@ async function uninstallApp(k, s, a) {
 const IMAGE_EXT = new Set(['.png', '.jpg', '.jpeg', '.webp', '.gif', '.bmp', '.avif', '.svg']);
 
 export function renderPage(id, el, env) {
-  const fn = RENDER[id];
+  const fn = RENDER[id] || A11Y_PAGES[id];
   return fn ? fn(el, env) : null;
 }
 
@@ -509,7 +508,7 @@ async function browse(k, s, folder, done) {
 async function wallpaperGrid(k, s, key, folder, rerender, { colors = false, same = false } = {}) {
   const current = s.get(key);
   const pick = (spec) => { s.set(key, spec); rerender(); };
-  const btn = (spec, label, content) => h('button.choice', { type: 'button', role: 'radio', title: label, 'aria-label': label, 'aria-checked': String(current === spec), 'aria-pressed': String(current === spec), onclick: () => pick(spec) }, content);
+  const btn = (spec, label, content) => h('button.choice', { type: 'button', role: 'radio', title: label, 'aria-label': label, 'aria-checked': String(current === spec), onclick: () => pick(spec) }, content);
   const items = [];
   if (same) items.push(btn('same', 'Same as desktop', h('div.wp-solid', { style: { display: 'grid', placeItems: 'center', background: 'var(--surface-3)', fontSize: '12px' } }, 'Same as desktop')));
   for (const w of BUILTIN_WALLPAPERS) items.push(btn(w.id, w.name, h('img', { src: builtinUrl(w.id.slice(8), true), alt: '' })));
@@ -519,5 +518,5 @@ async function wallpaperGrid(k, s, key, folder, rerender, { colors = false, same
     items.push(btn(`file:${e.path}`, e.name, h('img', { src: url, alt: '' })));
   }
   if (colors) for (const c of SOLID_COLORS) items.push(btn(`color:${c}`, `Solid colour ${c}`, h('div.wp-solid', { style: { background: c } })));
-  return h('div.wp-grid', { role: 'radiogroup' }, items);
+  return h('div.wp-grid', { role: 'radiogroup', 'aria-label': key === 'appearance.lockWallpaper' ? 'Lock screen picture' : 'Background' }, items);
 }

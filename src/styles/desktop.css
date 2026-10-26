@@ -3,7 +3,7 @@
 .desktop { position: absolute; inset: 0; outline: none; overflow: hidden; }
 .dicon {
   position: absolute; display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 6px 4px 4px;
-  border: 1px solid transparent; border-radius: var(--radius-s); color: #fff; cursor: default; text-align: center;
+  border: 1px solid transparent; border-radius: var(--radius-s); color: #fff; cursor: var(--cur-default, default); text-align: center;
   transition: left .2s var(--ease-out), top .2s var(--ease-out);
 }
 .dicon:hover { background: rgba(255, 255, 255, .12); border-color: rgba(255, 255, 255, .18); }

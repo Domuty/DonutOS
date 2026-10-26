@@ -119,17 +119,19 @@ export class Search {
     const rows = [];
     let i = 0;
     for (const [g, items] of groups) {
-      rows.push(h('div.search-group', g));
-      for (const r of items) {
+      // Results are a list box of options in labelled groups (Best match, Apps, Settings…).
+      const gid = `sg-${g.replace(/\W+/g, '')}`;
+      rows.push(h('div', { role: 'group', 'aria-labelledby': gid }, h('div.search-group', { id: gid, role: 'presentation' }, g), items.map((r) => {
         const idx = i++;
-        rows.push(h('div.search-row', { role: 'option', id: `sr-${idx}`, 'aria-selected': String(idx === 0), dataset: { idx },
+        return h('div.search-row', { role: 'option', id: `sr-${idx}`, 'aria-selected': String(idx === 0), dataset: { idx },
           onclick: () => r.open(), onpointerenter: () => this.select(idx, false) },
         r.icon ? h('img', { src: r.icon, alt: '' }) : icon(r.iconName || 'info', { size: 24 }),
-        h('span', h('b', r.title), h('small', r.sub))));
-      }
+        h('span', h('b', r.title), h('small', r.sub)));
+      })));
     }
-    if (searchingFiles) rows.push(h('div.search-note', 'Searching your files…'));
-    if (!this.results.length && !searchingFiles) rows.push(h('div.search-note', 'No results. Try different words.'));
+    if (searchingFiles) rows.push(h('div.search-note', { role: 'option', 'aria-disabled': 'true' }, 'Searching your files…'));
+    if (!this.results.length && !searchingFiles) rows.push(h('div.search-note', { role: 'option', 'aria-disabled': 'true' }, 'No results. Try different words.'));
+    this.list.setAttribute('role', 'listbox');
     mount(this.list, rows);
     this.select(0, false);
   }
@@ -157,10 +159,13 @@ export class Search {
     const top = this.settings.get('start.recentApps').map((r) => this.kernel.registry.get(r.id)).filter(Boolean).slice(0, 6);
     const fallback = top.length ? top : this.kernel.registry.list().slice(0, 6);
     this.results = [];
+    // Before typing: buttons for top apps and recent searches (not a list box of results).
+    this.list.removeAttribute('role');
+    this.input.removeAttribute('aria-activedescendant');
     mount(this.list,
-      h('div.search-group', 'Top apps'),
-      h('div.search-top', fallback.map((a) => h('button.start-app', { type: 'button', onclick: () => { this.close(); rememberRecentApp(this.kernel, a.id); launchApp(this.kernel, a.id); } }, h('img', { src: a.icon, alt: '' }), h('span', a.name)))),
-      hist.length ? [h('div.search-group', 'Recent searches'), hist.map((q) => h('div.search-row', { onclick: () => this.open(q) }, icon('restart', { size: 18 }), h('span', h('b', q))))] : null);
+      h('div.search-group', { id: 'sg-top' }, 'Top apps'),
+      h('div.search-top', { role: 'group', 'aria-labelledby': 'sg-top' }, fallback.map((a) => h('button.start-app', { type: 'button', onclick: () => { this.close(); rememberRecentApp(this.kernel, a.id); launchApp(this.kernel, a.id); } }, h('img', { src: a.icon, alt: '' }), h('span', a.name)))),
+      hist.length ? [h('div.search-group', { id: 'sg-recent' }, 'Recent searches'), h('div', { role: 'group', 'aria-labelledby': 'sg-recent' }, hist.map((q) => h('button.search-row', { type: 'button', onclick: () => this.open(q) }, icon('restart', { size: 18 }), h('span', h('b', q)))))] : null);
     mount(this.detail, h('div.search-hello', h('img', { src: 'assets/brand/logo.svg', alt: '' }), h('p', 'Search apps, settings and the files in your folder — including what’s written inside them.')));
   }
 }

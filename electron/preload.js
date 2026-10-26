@@ -13,7 +13,7 @@ const INVOKE = new Set([
   'host:importFiles', 'host:exportFile', 'host:openExternal',
   'updates:status', 'updates:check', 'updates:install',
   'capture:screen',
-  'browser:setDownloadDir', 'browser:cancelDownload', 'browser:clearData',
+  'browser:setDownloadDir', 'browser:cancelDownload', 'browser:clearData', 'browser:sendKey',
 ]);
 const EVENTS = new Set(['updates:status', 'display:fullscreen', 'shell:closeRequest', 'browser:open', 'browser:download', 'browser:contextMenu']);
 

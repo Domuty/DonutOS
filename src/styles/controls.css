@@ -6,7 +6,7 @@
   display: inline-flex; align-items: center; justify-content: center; gap: 8px;
   min-height: 32px; padding: 5px 14px; border-radius: var(--radius-s);
   border: 1px solid var(--border); border-bottom-color: var(--border-strong);
-  background: var(--surface-2); color: var(--text); cursor: default; white-space: nowrap;
+  background: var(--surface-2); color: var(--text); cursor: var(--cur-default, default); white-space: nowrap;
   transition: background .12s, opacity .12s;
 }
 .btn:hover { background: var(--hover); }
@@ -15,12 +15,12 @@
 .btn.primary { background: var(--accent); color: var(--accent-contrast); border-color: transparent; }
 .btn.primary:hover { background: var(--accent-hover); }
 .btn.primary:active { opacity: .85; }
-.btn.danger { background: var(--danger); color: #fff; border-color: transparent; }
+.btn.danger { background: var(--danger-fill, #c42b1c); color: #fff; border-color: transparent; }
 .btn.subtle { background: transparent; border-color: transparent; }
 .btn.subtle:hover { background: var(--hover); }
 .btn.icon { padding: 0; width: 32px; }
 .btn.block { width: 100%; }
-.link { color: var(--accent-text); background: none; border: 0; padding: 0; cursor: pointer; text-decoration: none; }
+.link { color: var(--accent-text); background: none; border: 0; padding: 0; cursor: var(--cur-pointer, pointer); text-decoration: none; }
 .link:hover { text-decoration: underline; }
 
 .input {
@@ -40,7 +40,7 @@ select.input option { background: var(--surface-solid); color: var(--text); }
 .error-text { font-size: 12.5px; color: var(--danger); min-height: 1em; }
 
 /* Toggle switch: <label class="toggle"><input type="checkbox"><span></span></label> */
-.toggle { position: relative; display: inline-flex; align-items: center; gap: 10px; cursor: default; }
+.toggle { position: relative; display: inline-flex; align-items: center; gap: 10px; cursor: var(--cur-default, default); }
 .toggle input { position: absolute; opacity: 0; width: 40px; height: 20px; margin: 0; }
 .toggle > span { width: 40px; height: 20px; border-radius: 10px; border: 1px solid var(--text-2); position: relative; transition: background .15s, border-color .15s; }
 .toggle > span::after { content: ""; position: absolute; top: 3px; left: 3px; width: 12px; height: 12px; border-radius: 50%; background: var(--text-2); transition: transform .2s var(--ease-out), background .15s, width .1s; }
@@ -50,7 +50,7 @@ select.input option { background: var(--surface-solid); color: var(--text); }
 
 /* Radio-style segmented choices */
 .choices { display: flex; flex-wrap: wrap; gap: 8px; }
-.choice { border: 2px solid transparent; border-radius: var(--radius); padding: 0; background: none; cursor: default; position: relative; }
+.choice { border: 2px solid transparent; border-radius: var(--radius); padding: 0; background: none; cursor: var(--cur-default, default); position: relative; }
 .choice[aria-pressed="true"] { border-color: var(--accent); }
 .choice:hover { filter: brightness(1.05); }
 
@@ -74,7 +74,7 @@ select.input option { background: var(--surface-solid); color: var(--text); }
 @keyframes menu-in { from { opacity: 0; transform: translateY(6px); } }
 .menu.up { animation-name: menu-in-up; }
 @keyframes menu-in-up { from { opacity: 0; transform: translateY(-6px); } }
-.menu button { display: flex; align-items: center; gap: 12px; width: 100%; padding: 8px 12px; border: 0; border-radius: var(--radius-s); background: none; text-align: left; cursor: default; }
+.menu button { display: flex; align-items: center; gap: 12px; width: 100%; padding: 8px 12px; border: 0; border-radius: var(--radius-s); background: none; text-align: left; cursor: var(--cur-default, default); }
 .menu button:hover, .menu button:focus-visible { background: var(--hover); outline: none; }
 .menu button:disabled { opacity: .4; }
 .menu hr { border: 0; border-top: 1px solid var(--border); margin: 4px 0; }
@@ -129,14 +129,14 @@ select.input option { background: var(--surface-solid); color: var(--text); }
 
 /* Tabs (segmented) */
 .tabs { display: flex; gap: 4px; }
-.tabs button { border: 0; background: none; padding: 6px 12px; border-radius: var(--radius-s); color: var(--text-2); position: relative; cursor: default; }
+.tabs button { border: 0; background: none; padding: 6px 12px; border-radius: var(--radius-s); color: var(--text-2); position: relative; cursor: var(--cur-default, default); }
 .tabs button:hover { background: var(--hover); color: var(--text); }
 .tabs button[aria-selected="true"] { color: var(--text); }
 .tabs button[aria-selected="true"]::after { content: ""; position: absolute; left: 50%; bottom: 0; width: 16px; height: 3px; margin-left: -8px; border-radius: 2px; background: var(--accent); }
 
 /* Menu bar (File Edit View …) */
 .menubar { display: flex; gap: 2px; padding: 2px 6px; flex: none; }
-.mb-item { border: 0; background: none; color: inherit; font: inherit; font-size: 13px; padding: 5px 11px; border-radius: var(--radius-s); cursor: default; }
+.mb-item { border: 0; background: none; color: inherit; font: inherit; font-size: 13px; padding: 5px 11px; border-radius: var(--radius-s); cursor: var(--cur-default, default); }
 .mb-item:hover, .mb-item.open { background: var(--hover); }
 
 /* Dialogs that belong to one window cover only that window. */
@@ -149,11 +149,11 @@ select.input option { background: var(--surface-solid); color: var(--text); }
 .fd-path { flex: 1; min-width: 0; }
 .fd-main { display: grid; grid-template-columns: 150px minmax(0, 1fr); gap: 8px; height: 300px; }
 .fd-places { display: grid; align-content: start; gap: 2px; overflow: auto; }
-.fd-place { display: flex; align-items: center; gap: 10px; border: 0; background: none; color: inherit; font: inherit; font-size: 13px; padding: 7px 10px; border-radius: var(--radius-s); text-align: left; cursor: default; }
+.fd-place { display: flex; align-items: center; gap: 10px; border: 0; background: none; color: inherit; font: inherit; font-size: 13px; padding: 7px 10px; border-radius: var(--radius-s); text-align: left; cursor: var(--cur-default, default); }
 .fd-place:hover { background: var(--hover); }
 .fd-list { overflow: auto; border: 1px solid var(--border); border-radius: var(--radius-s); background: var(--input-bg); outline: none; padding: 4px; }
 .fd-list:focus-visible { box-shadow: 0 0 0 2px var(--accent); }
-.fd-item { display: grid; grid-template-columns: 20px minmax(0, 1fr) 80px 90px; align-items: center; gap: 10px; padding: 5px 8px; border-radius: 4px; font-size: 13px; cursor: default; }
+.fd-item { display: grid; grid-template-columns: 20px minmax(0, 1fr) 80px 90px; align-items: center; gap: 10px; padding: 5px 8px; border-radius: 4px; font-size: 13px; cursor: var(--cur-default, default); }
 .fd-item:hover { background: var(--hover); }
 .fd-item[aria-selected="true"] { background: var(--accent-soft); }
 .fd-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

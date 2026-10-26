@@ -215,6 +215,15 @@ export default function main(ctx) {
     else if (page === 'users') renderUsers();
     else if (page === 'details') renderDetails();
     else if (page === 'settings') { if (!tick || changed) renderSettings(); }
+    gridRoles(content);
+  }
+
+  // Every child of a table row is a cell (or a column header), so screen readers can read
+  // the tables as grids.
+  function gridRoles(root) {
+    for (const r of root.querySelectorAll('.tm-table [role="row"]')) {
+      for (const c of r.children) if (!c.getAttribute('role')) c.setAttribute('role', r.classList.contains('tm-header') ? 'columnheader' : 'gridcell');
+    }
   }
 
   function sortRows(rows, s, get) {
@@ -247,7 +256,7 @@ export default function main(ctx) {
       const wins = windowsOf(p.pid, p.user);
       const open = expanded.has(p.pid);
       return [h('div.tm-row', {
-        role: 'row', tabindex: '0', 'aria-selected': String(selected === p.pid), class: selected === p.pid && 'sel',
+        role: 'row', tabindex: '0', 'aria-selected': String(selected === p.pid), class: selected === p.pid && 'sel', 'aria-expanded': wins.length ? String(open) : undefined,
         onclick: () => { selected = p.pid; render(); }, ondblclick: () => switchTo(p.pid),
         oncontextmenu: (e) => { e.preventDefault(); selected = p.pid; render(); menuFor(p, e); },
         onkeydown: (e) => {
@@ -264,18 +273,18 @@ export default function main(ctx) {
       h('div.tm-cell', p.status),
       h('div.tm-cell.num', { style: heat(p.cpu, 100) }, pct(p.cpu)),
       h('div.tm-cell.num', { style: heat(p.memory, 64 * 1024 ** 2) }, mb(p.memory))),
-      open ? wins.map((w) => h('div.tm-row.tm-sub', { role: 'row', ondblclick: () => switchTo(p.pid), onclick: () => { selected = p.pid; render(); } },
+      open ? wins.map((w) => h('div.tm-row.tm-sub', { role: 'row', 'aria-level': '2', ondblclick: () => switchTo(p.pid), onclick: () => { selected = p.pid; render(); } },
         h('div.tm-cell.tm-name', h('span.tm-twisty'), h('span.tm-indent'), icon('view', { size: 14 }), h('span', w.title || p.name)), h('div.tm-cell'), h('div.tm-cell'), h('div.tm-cell'))) : null];
     };
-    const group = (label, list) => (list.length ? [h('div.tm-group', { role: 'row' }, `${label} (${list.length})`), sortRows([...list], sort, get).map(row)] : null);
+    const group = (label, list) => (list.length ? [h('div.tm-group', { role: 'row' }, h('span', { role: 'rowheader', 'aria-colspan': '4' }, `${label} (${list.length})`)), sortRows([...list], sort, get).map(row)] : null);
     const focusedPid = document.activeElement?.closest?.('.tm-row') && selected;
-    mount(content, h('div.tm-table.tm-procs', { role: 'grid', 'aria-label': 'Processes' },
+    mount(content, h('div.tm-table.tm-procs', { role: 'treegrid', 'aria-label': 'Processes' },
       h('div.tm-row.tm-header', { role: 'row' },
         th('Name', 'name', sort, onSort), th('Status', 'status', sort, onSort),
         th(h('span.tm-th-top', h('b', pct(totalCpu)), h('small', 'CPU')), 'cpu', sort, onSort, '.num'),
         th(h('span.tm-th-top', h('b', memPct !== null ? `${memPct < 10 ? memPct.toFixed(1) : Math.round(memPct)}%` : '—'), h('small', 'Memory')), 'memory', sort, onSort, '.num')),
-      group('Apps', apps), group('Background processes', bg), group('DonutOS processes', sys),
-      !mine.length ? h('p.tm-empty', query ? `No processes match “${query}”.` : 'Nothing is running.') : null));
+      group('Apps', apps), group('Background processes', bg), group('DonutOS processes', sys)),
+      !mine.length ? h('p.tm-empty', query ? `No processes match “${query}”.` : 'Nothing is running.') : null);
     if (focusedPid) content.querySelector('.tm-row.sel')?.focus({ preventScroll: true });
   }
 

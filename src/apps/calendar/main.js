@@ -162,9 +162,7 @@ export default function main(ctx) {
     const end = addDays(start, weeks * 7);
     const occ = occurrences(start, end);
     const today = new Date();
-    mount(body, h('div.cal-month', { style: { '--weeks': weeks } },
-      weekdayNames().map((d) => h('div.cal-dow', d)),
-      Array.from({ length: weeks * 7 }, (_, i) => {
+    const cells = Array.from({ length: weeks * 7 }, (_, i) => {
         const d = addDays(start, i);
         const next = addDays(d, 1);
         const todays = occ.filter((o) => o.start < +next && Math.max(o.end, o.start + 1) > +d);
@@ -174,7 +172,11 @@ export default function main(ctx) {
         h('div.cal-chips', todays.slice(0, 3).map((o) => chip(o)), todays.length > 3 ? h('button.cal-more', { type: 'button', onclick: () => { cursor = startOfDay(d); view = 'day'; render(); } }, `+${todays.length - 3} more`) : null));
         dropTarget(cell, d);
         return cell;
-      })));
+      });
+    // Week rows (display: contents) so screen readers see a grid of days.
+    mount(body, h('div.cal-month', { role: 'grid', 'aria-label': fmt(cursor, { month: 'long', year: 'numeric' }), style: { '--weeks': weeks } },
+      h('div.cal-week', { role: 'row' }, weekdayNames().map((d) => h('div.cal-dow', { role: 'columnheader' }, d))),
+      Array.from({ length: weeks }, (_, w) => h('div.cal-week', { role: 'row' }, cells.slice(w * 7, w * 7 + 7)))));
   }
 
   function renderTimeGrid(days) {

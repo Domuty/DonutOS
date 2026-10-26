@@ -19,6 +19,16 @@ const APP_VERSION = '0.1.0';
 // it (GitHub Pages, offline) the answer is null and the Browser tries the frame anyway.
 const frameAnswers = new Map();
 let frameCheckMissing = false;
+// The Browser's relay (api/relay): whether this host has it, asked once.
+let relayProbe = null;
+const relayBase = () => new URL('api/relay?url=', document.baseURI).href;
+function relayAvailable() {
+  relayProbe ||= fetch(new URL('api/relay?probe=1', document.baseURI))
+    .then(async (r) => r.ok && (r.headers.get('content-type') || '').includes('json') && (await r.json()).relay === true)
+    .catch(() => { relayProbe = null; return false; });
+  return relayProbe;
+}
+
 async function frameCheck(url) {
   if (frameCheckMissing || !/^https?:/i.test(url)) return null;
   const cached = frameAnswers.get(url);
@@ -230,13 +240,17 @@ export function createWebAdapter({ dbName = DB_NAME } = {}) {
     // Pages load in sandboxed iframes; the browser itself handles downloads and storage.
     browser: {
       kind: 'frame',
-      createView: () => createFrameView(),
+      createView: ({ relay = false } = {}) => (relay ? createFrameView({ sandbox: 'relay', relayBase: relayBase() }) : createFrameView()),
+      // Sites that refuse frames can be shown through the relay where the host has one (Vercel, serve.js).
+      relayAvailable,
       setDownloadDir: async () => {},
       onDownload: () => () => {},
       cancelDownload: async () => {},
       onOpenRequest: () => () => {},
       clearData: async () => {},
       canEmbed: frameCheck,
+      // Pages are cross-origin frames: DonutOS can't type into them.
+      sendKey: async () => false,
     },
 
     updates: {

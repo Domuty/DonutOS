@@ -105,4 +105,4 @@ async function check(rawUrl, rawEmbedder, { allowPrivate = false } = {}) {
   }
 }
 
-module.exports = { check, decide, isPrivateAddress, sourceMatches };
+module.exports = { check, decide, isPrivateAddress, sourceMatches, assertPublic };

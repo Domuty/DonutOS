@@ -23,6 +23,7 @@ import { dialog } from '../ui/dialog.js';
 import { installPermissionPrompt } from './permission-prompt.js';
 import { playSound } from './sounds.js';
 import { closeMenu } from '../ui/menu.js';
+import { Accessibility } from './a11y/index.js';
 
 export class Shell {
   constructor(kernel, root) {
@@ -48,6 +49,7 @@ export class Shell {
     const done = await runBoot(this.root, this.kernel);
     installPermissionPrompt(this.kernel);
     watchTheme(this.kernel.settings);
+    applyTheme(this.kernel.settings); // the sign-in screen's accessibility (contrast) before anyone signs in
     this.kernel.bus.on('session:changed', () => applyTheme(this.kernel.settings));
     // Requests from system apps (Task Manager) for things only the shell can do.
     this.kernel.bus.on('shell:signOutRequest', ({ uid }) => {
@@ -56,6 +58,7 @@ export class Shell {
     });
     this.kernel.bus.on('shell:runDialog', () => { if (this.inSession()) runDialog(this.kernel, this.view); });
     this.filters = new DisplayFilters(this.kernel, this.root);
+    this.a11y = new Accessibility(this.kernel, { openSettings: (page) => launchApp(this.kernel, 'settings', { page }), inSession: () => this.inSession() });
     this.#installShortcuts();
     this.#installAutoLock();
     this.#installFocusTimer();

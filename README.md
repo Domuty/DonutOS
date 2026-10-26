@@ -40,13 +40,20 @@ site's data in your browser (web) / delete `Documents/DonutOS` and the app's dat
 ## Deploy the web version
 
 Push to GitHub and import the repo in Vercel. `vercel.json` already configures everything:
-output folder `src`, no install step, and the small `api/frame-check` function.
+output folder `src`, no install step, and two small functions in `api/` for the Browser app.
 
-That function lets the Browser app tell which websites refuse to be shown inside another page.
-Most big sites refuse, and on the web version the Browser then offers to open them in a new tab
-of your real browser. On static hosts without functions (e.g. GitHub Pages), those sites show a
-blank page with the same "open in browser tab" notice. The desktop version doesn't need any of
-this.
+- **`api/relay`** shows websites inside the Browser window. Most big sites refuse to be shown
+  inside another page, so on the web version the Browser fetches pages through your
+  deployment instead. Relayed pages are sealed off from DonutOS. No cookies are kept, so
+  signing in to websites doesn't work, and some video or very interactive sites may not
+  either. All Browser traffic goes through your Vercel account. You can turn the relay off
+  in Browser › Settings.
+- **`api/frame-check`** is used when the relay is off: it tells the Browser which sites refuse to
+  be shown, so it can offer to open them in a normal tab instead of showing a blank page.
+
+On static hosts without functions (e.g. GitHub Pages), sites that refuse to be shown stay
+blank, with a notice offering to open them in a normal tab. The desktop version needs none of
+this: every site works inside the window.
 
 ## Make an app
 

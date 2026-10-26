@@ -10,25 +10,32 @@ import { showMenu } from '../ui/menu.js';
 import { alertDialog, confirmDialog, promptDialog } from '../ui/dialog.js';
 import { openFileDialog, saveFileDialog } from '../ui/file-dialog.js';
 import { PERMISSIONS } from '../core/permissions.js';
+import { a11yChannel } from '../shell/a11y/channel.js';
 
 const TOKENS = ['--bg', '--surface', '--surface-2', '--surface-3', '--surface-raised', '--surface-solid', '--text', '--text-2', '--text-3', '--border', '--border-strong',
   '--hover', '--press', '--input-bg', '--input-border', '--accent', '--accent-hover', '--accent-soft', '--accent-text', '--accent-contrast', '--ok', '--warn', '--danger',
-  '--radius', '--radius-s', '--radius-l', '--shadow', '--shadow-s', '--font', '--font-display', '--font-mono', '--ease-out', '--ease-in', '--dur'];
+  '--radius', '--radius-s', '--radius-l', '--shadow', '--shadow-s', '--font', '--font-display', '--font-mono', '--ease-out', '--ease-in', '--dur',
+  '--hc-button-text', '--hc-button-bg', '--danger-fill',
+  '--cur-default', '--cur-pointer', '--cur-text', '--cur-move', '--cur-crosshair', '--cur-ns', '--cur-ew', '--cur-nwse', '--cur-nesw', '--cur-grab', '--cur-grabbing', '--cur-cell'];
 
 let sdkCache = null;
 async function sdkAssets() {
-  sdkCache ||= Promise.all([
-    fetch(new URL('../sdk/donut-sdk.js', import.meta.url)).then((r) => r.text()),
-    fetch(new URL('../sdk/sdk.css', import.meta.url)).then((r) => r.text()),
-  ]);
+  const text = (path) => fetch(new URL(path, import.meta.url)).then((r) => r.text());
+  // The SDK, its styles, and two DonutOS modules it uses for Narrator and the on-screen keyboard.
+  sdkCache ||= Promise.all([text('../sdk/donut-sdk.js'), text('../sdk/sdk.css'), text('../ui/a11y-name.js'), text('../shell/a11y/edit-actions.js')]);
   return sdkCache;
 }
 
 const b64 = (text) => { const b = new TextEncoder().encode(text); let s = ''; for (let i = 0; i < b.length; i += 0x8000) s += String.fromCharCode(...b.subarray(i, i + 0x8000)); return btoa(s); };
 
 export function themeSnapshot() {
-  const cs = getComputedStyle(document.documentElement);
-  return { mode: document.documentElement.dataset.theme === 'light' ? 'light' : 'dark', tokens: Object.fromEntries(TOKENS.map((t) => [t, cs.getPropertyValue(t).trim()]).filter(([, v]) => v)) };
+  const root = document.documentElement;
+  const cs = getComputedStyle(root);
+  return {
+    mode: root.dataset.theme === 'light' ? 'light' : 'dark',
+    contrast: root.dataset.contrast || null, focusRing: root.dataset.focusRing || 'normal', scrollbars: root.dataset.scrollbars || 'auto', cursor: root.dataset.cursor || null,
+    tokens: Object.fromEntries(TOKENS.map((t) => [t, cs.getPropertyValue(t).trim()]).filter(([, v]) => v)),
+  };
 }
 
 export function sandboxModule(app) {
@@ -38,12 +45,16 @@ export function sandboxModule(app) {
 async function runSandboxed(app, ctx) {
   const win = ctx.windows.create({ title: app.name, ...(app.window || {}) });
   win.body.classList.add('sandboxed-app');
-  const [sdk, sdkCss] = await sdkAssets();
+  const [sdk, sdkCss, a11yName, editActions] = await sdkAssets();
   const frame = h('iframe.sandbox-frame', { sandbox: 'allow-scripts allow-forms allow-pointer-lock', title: app.name, allow: 'clipboard-write; autoplay; fullscreen' });
   const csp = "default-src 'none'; script-src 'unsafe-inline' data:; style-src 'unsafe-inline' data:; img-src data: blob:; media-src data: blob:; font-src data:; connect-src data: blob:; worker-src blob: data:";
   frame.srcdoc = `<!doctype html><html><head><meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="${csp}">
 <style>${sdkCss}</style>
-<script type="importmap">${JSON.stringify({ imports: { '@donut/sdk': `data:text/javascript;base64,${b64(sdk)}` } })}</script>
+<script type="importmap">${JSON.stringify({ imports: {
+    '@donut/sdk': `data:text/javascript;base64,${b64(sdk)}`,
+    '@donut/a11y-name': `data:text/javascript;base64,${b64(a11yName)}`,
+    '@donut/edit-actions': `data:text/javascript;base64,${b64(editActions)}`,
+  } })}</script>
 <script type="module">import '@donut/sdk';</script></head><body><div id="app"></div></body></html>`;
   win.body.append(frame);
 
@@ -120,7 +131,7 @@ async function runSandboxed(app, ctx) {
     if (!m || typeof m !== 'object') return;
     if (m.type === 'ready') {
       post({ type: 'init', app: publicManifest(app), args: ctx.args, source: b64(app.source), storage: Object.fromEntries(storagePrefix().map((k) => [k, ctx.storage.get(k)])),
-        user: { name: me?.name || 'User', home: me?.home || '/Users/Public' }, theme: themeSnapshot() });
+        user: { name: me?.name || 'User', home: me?.home || '/Users/Public' }, theme: themeSnapshot(), a11y: a11yState() });
     } else if (m.type === 'call') {
       const fn = Object.hasOwn(methods, m.method) ? methods[m.method] : null;
       try {
@@ -141,6 +152,13 @@ async function runSandboxed(app, ctx) {
       showCrash(m.message);
     } else if (m.type === 'error') {
       ctx.system.log(`Error in ${app.name}: ${m.message}`);
+    } else if (m.type === 'pointer') {
+      // Magnifier follows the pointer inside the app too: frame coordinates → screen.
+      const r = frame.getBoundingClientRect();
+      const k = frame.clientWidth ? r.width / frame.clientWidth : 1;
+      a11yChannel.emit('pointer', { x: r.left + Number(m.x) * k, y: r.top + Number(m.y) * k });
+    } else if (m.type === 'say') {
+      a11yChannel.emit('say', { text: String(m.text || '').slice(0, 1000), interrupt: !!m.interrupt });
     } else if (m.type === 'beforeCloseResult') {
       closeWaits.get(m.id)?.(m.ok);
       closeWaits.delete(m.id);
@@ -169,6 +187,11 @@ async function runSandboxed(app, ctx) {
   ctx.onActivate((args) => { win.focus(); event('activate', args || {}); });
   ctx.onNotification((n) => event('notification', { actionId: n.actionId, data: n.data }));
   ctx.own(ctx.settings.watch('appearance.*', () => setTimeout(() => event('theme', themeSnapshot()), 50)));
+  // Accessibility: theme-like changes (contrast, pointer, focus indicator), and whether
+  // Magnifier and Narrator need the app's pointer moves and focus changes.
+  const a11yState = () => ({ pointer: !!ctx.settings.get('a11y.magnifier'), narrator: !!ctx.settings.get('a11y.narrator'), echo: ctx.settings.get('a11y.narratorKeyEcho') });
+  ctx.own(ctx.settings.watch('a11y.*', () => setTimeout(() => { event('theme', themeSnapshot()); post({ type: 'a11y', ...a11yState() }); }, 50)));
+  ctx.own(a11yChannel.on('key', ({ frame: f, key, code, mods }) => { if (f === frame) post({ type: 'oskKey', key, code, mods }); }));
 }
 
 function publicManifest(app) {

@@ -2,6 +2,7 @@
 // bar, history, downloads, zoom, find in page, private tabs, a new-tab page with your most
 // visited sites, and opening HTML/PDF/SVG files from your folders.
 
+import { createTabStrip, renderTabStrip, tabCloser } from '../common/tabs.js';
 import { h, mount } from '../../ui/h.js';
 import { icon } from '../../ui/icons.js';
 import { showMenu } from '../../ui/menu.js';
@@ -9,12 +10,12 @@ import { promptDialog, confirmDialog, alertDialog } from '../../ui/dialog.js';
 import { formatBytes } from '../../core/util.js';
 import * as P from '../../core/path.js';
 
-// Google's igu=1 mode allows its results to be shown inside other pages, so searches stay in
-// the window on the web version too (most other engines refuse to be framed).
-const DEFAULT_ENGINE = 'google';
+// Google's igu=1 mode allows its results to be shown inside other pages (useful on the web
+// version without a relay).
+const DEFAULT_ENGINE = 'duckduckgo';
 const ENGINES = {
-  google: ['Google', 'https://www.google.com/search?igu=1&q='],
   duckduckgo: ['DuckDuckGo', 'https://duckduckgo.com/?q='],
+  google: ['Google', 'https://www.google.com/search?igu=1&q='],
   bing: ['Bing', 'https://www.bing.com/search?q='],
   startpage: ['Startpage', 'https://www.startpage.com/do/search?q='],
   wikipedia: ['Wikipedia', 'https://en.wikipedia.org/w/index.php?search='],
@@ -37,11 +38,14 @@ export default function main(ctx) {
   let frameNoticeDismissed = store.get('frameNotice', false);
   const downloads = new Map(store.get('downloads', []).map((d) => [d.id, d]));
   const engine = () => ENGINES[store.get('engine', DEFAULT_ENGINE)] || ENGINES[DEFAULT_ENGINE];
+  // Whether this host has the relay (web version on Vercel or serve.js), and whether it's in use.
+  let relayHere = false, relayOn = false;
+  B.relayAvailable().then((ok) => { relayHere = ok; relayOn = ok && store.get('relay', true); }).catch(() => {});
   const bookmarks = () => store.get('bookmarks', []);
   const history = () => store.get('history', []);
 
   // ── Chrome ───────────────────────────────────────────────────────────
-  const tabStrip = h('div.ex-tabs.drag', { role: 'tablist', 'aria-label': 'Tabs' });
+  const tabStrip = createTabStrip('Tabs');
   win.titlebar.append(tabStrip);
   const address = h('input.input.br-address', { spellcheck: false, autocomplete: 'off', 'aria-label': 'Address and search bar', placeholder: `Search ${engine()[0]} or type a web address`,
     onkeydown: (e) => {
@@ -99,7 +103,7 @@ export default function main(ctx) {
   }
 
   function renderTabs() {
-    mount(tabStrip, tabs.map((t) => h('div.ex-tab', {
+    renderTabStrip(tabStrip, tabs.map((t) => h('div.ex-tab', {
       role: 'tab', tabindex: '0', 'aria-selected': String(t === active), class: t === active && 'active', title: t.title,
       onclick: () => activate(t), onauxclick: (e) => { if (e.button === 1) closeTab(t); },
       oncontextmenu: (e) => { e.preventDefault(); showMenu([
@@ -108,7 +112,7 @@ export default function main(ctx) {
       ], { x: e.clientX, y: e.clientY }); },
     }, t.loading ? h('span.br-spin') : t.favicon ? h('img', { src: t.favicon, alt: '', onerror: (e) => e.target.replaceWith(icon('globe', { size: 14 })) }) : icon(t.internal && t.internal !== 'about:blocked' ? 'apps' : 'globe', { size: 14 }),
     h('span', t.title || t.url),
-    h('button.ex-tab-x', { type: 'button', 'aria-label': 'Close tab', onclick: (e) => { e.stopPropagation(); closeTab(t); } }, icon('close', { size: 10 })))),
+    tabCloser('Close tab', () => closeTab(t)))),
     h('button.ex-tab-new', { type: 'button', title: 'New tab (Ctrl+T or Alt+T)', 'aria-label': 'New tab', onclick: () => newTab() }, icon('plus', { size: 14 })));
     win.setTitle(`${active?.title || 'Browser'} — Browser${privateWindow ? ' (private)' : ''}`);
   }
@@ -144,29 +148,38 @@ export default function main(ctx) {
     if (/^(https?|file|data|blob):/i.test(s)) return s;
     if (/^localhost(:\d+)?(\/|$)/i.test(s) || /^(\d{1,3}\.){3}\d{1,3}(:\d+)?(\/|$)/.test(s)) return `http://${s}`;
     if (!/\s/.test(s) && /^[^\s/]+\.[a-z]{2,}(:\d+)?(\/.*)?$/i.test(s)) return `https://${s}`;
-    return engine()[1] + encodeURIComponent(s);
+    return searchUrl(s);
+  }
+  // DuckDuckGo's plain-HTML results page works through the relay (no scripts needed).
+  function searchUrl(q) {
+    const id = store.get('engine', DEFAULT_ENGINE);
+    if (id === 'duckduckgo' && relayOn) return `https://html.duckduckgo.com/html/?q=${encodeURIComponent(q)}`;
+    return engine()[1] + encodeURIComponent(q);
   }
 
   async function navigate(tab, input) {
-    const url = toUrl(input);
+    let url = toUrl(input);
     tab.error = null;
     if (INTERNAL[url]) { showInternal(tab, url); return; }
     if (url.startsWith('donut-file:')) { openLocal(tab, url.slice(11)); return; }
     if (tab.internal && tab.internal !== 'about:offline' && tab.internal !== 'about:error') tab.cameFrom = tab.internal;
     tab.internal = null;
     if (!B.online()) { tab.url = url; showOffline(tab); return; }
-    // Sites that refuse to be shown inside another page get a page of ours instead of an
-    // empty frame (only the web version's frames are affected; the answer is null if unknown).
     const seq = tab.navSeq = (tab.navSeq || 0) + 1;
     tab.url = url;
     tab.loading = true;
     if (tab === active) { renderChrome(); renderTabs(); }
-    const embeddable = await B.canEmbed(url).catch(() => null);
+    // Web version: pages come through DonutOS's relay when the host has one (so sites that
+    // refuse to be framed still show, and links inside them keep working). Without a relay,
+    // sites that refuse get a page of ours instead of an empty frame.
+    const relay = store.get('relay', true) && await B.relayAvailable().catch(() => false);
+    if (relay && url.startsWith(ENGINES.duckduckgo[1])) { url = `https://html.duckduckgo.com/html/?q=${url.slice(ENGINES.duckduckgo[1].length)}`; tab.url = url; }
+    const embeddable = relay ? true : await B.canEmbed(url).catch(() => null);
     if (tab.navSeq !== seq) return; // the user went somewhere else meanwhile
     tab.loading = false;
     if (embeddable === false) { showBlocked(tab, url); return; }
     try {
-      if (!tab.view || tab.fileView) await attachView(tab);
+      if (!tab.view || tab.fileView || !!tab.view.capabilities?.relay !== !!relay) await attachView(tab, { relay });
     } catch (err) {
       tab.internal = 'about:error';
       mount(tab.panel, h('div.br-page.br-center', icon('shield', { size: 44 }), h('h1', 'Browser can’t go online'), h('p', err.name === 'PermissionError' ? 'Internet access for Browser is turned off. You can allow it in Settings › Privacy & security.' : err.message)));
@@ -179,10 +192,11 @@ export default function main(ctx) {
     if (tab === active) { renderChrome(); renderTabs(); }
   }
 
-  async function attachView(tab) {
+  async function attachView(tab, { relay = false } = {}) {
     tab.view?.destroy();
     tab.fileView = false;
-    const v = await B.createView({ private: privateWindow });
+    const v = await B.createView({ private: privateWindow, relay });
+    v.on('open', ({ url }) => newTab(url, { background: false }));
     tab.view = v;
     v.setZoom(tab.zoom);
     v.on('loading', (on) => { tab.loading = on; if (tab === active) renderChrome(); renderTabs(); });
@@ -389,12 +403,15 @@ export default function main(ctx) {
       Object.entries(ENGINES).map(([id, [name]]) => h('option', { value: id, selected: store.get('engine', DEFAULT_ENGINE) === id }, name)));
     const home = h('input.input', { value: store.get('home', 'about:newtab'), 'aria-label': 'Home page', onchange: (e) => store.set('home', e.target.value.trim() || 'about:newtab') });
     const bar = h('input', { type: 'checkbox', checked: store.get('showBookmarks', true), onchange: (e) => { store.set('showBookmarks', e.target.checked); renderChrome(); } });
+    const relayBox = h('input', { type: 'checkbox', checked: store.get('relay', true), onchange: (e) => { store.set('relay', e.target.checked); relayOn = e.target.checked && relayHere; } });
     const zoom = h('select.input', { 'aria-label': 'Default zoom', onchange: (e) => store.set('zoom', Number(e.target.value)) }, [0.75, 0.9, 1, 1.1, 1.25, 1.5].map((z) => h('option', { value: z, selected: store.get('zoom', 1) === z }, `${Math.round(z * 100)}%`)));
     return h('div.br-page.br-settings', h('h1', 'Browser settings'),
       h('label.ck-field', 'Search engine used in the address bar', sel),
       h('label.ck-field', 'Home page (about:newtab or a web address)', home),
       h('label.ck-field', 'Default page zoom', zoom),
       h('label.wr-check', bar, 'Show the bookmarks bar'),
+      relayHere ? [h('label.wr-check', relayBox, 'Show websites through DonutOS’s relay'),
+        h('p.hint', 'Lets sites that don’t allow being shown inside other apps open in this window, and keeps links inside them working. Pages come through the server DonutOS is hosted on; they can’t sign you in (no cookies are kept), and some video and interactive sites may not work. Turn this off to show sites directly where they allow it.')] : null,
       h('h3', 'Clear browsing data'),
       h('div.wr-row',
         h('button.btn', { type: 'button', onclick: () => { store.set('history', []); } }, 'Clear history'),
@@ -548,7 +565,7 @@ export default function main(ctx) {
   function handleArgs(args) {
     if (args?.path) newTab(['.html', '.htm', '.pdf', '.svg'].includes(P.extname(args.path).toLowerCase()) ? `donut-file:${args.path}` : 'about:newtab');
     else if (args?.url) newTab(args.url);
-    else if (typeof args?.search === 'string' && args.search.trim()) newTab(engine()[1] + encodeURIComponent(args.search.trim()));
+    else if (typeof args?.search === 'string' && args.search.trim()) newTab(searchUrl(args.search.trim()));
     else if (!tabs.length) newTab(store.get('home', 'about:newtab'));
   }
   ctx.onActivate(handleArgs);

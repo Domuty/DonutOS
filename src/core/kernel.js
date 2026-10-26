@@ -352,9 +352,9 @@ export class Kernel {
       const b = k.platform.browser;
       return Object.freeze({
         kind: b.kind,
-        createView: async ({ private: incognito = false } = {}) => {
+        createView: async ({ private: incognito = false, relay = false } = {}) => {
           await need(proc, 'network');
-          const v = b.createView({ partition: incognito ? 'donut-private' : 'persist:donut-browser' });
+          const v = b.createView({ partition: incognito ? 'donut-private' : 'persist:donut-browser', relay });
           ctx.own(() => v.destroy());
           return v;
         },
@@ -371,6 +371,7 @@ export class Kernel {
         onOpenRequest: (fn) => ctx.own(b.onOpenRequest(proc.wrap(fn))),
         clearData: (what) => b.clearData(what),
         canEmbed: async (url) => { await need(proc, 'network'); return b.canEmbed(String(url)); },
+        relayAvailable: () => b.relayAvailable(),
       });
     });
 

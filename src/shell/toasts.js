@@ -5,7 +5,6 @@ import { card } from './notification-center.js';
 import { playSound } from './sounds.js';
 
 const MAX = 3;
-const SHOW_MS = 6000;
 
 export class Toasts {
   constructor(session) {
@@ -32,7 +31,8 @@ export class Toasts {
       card(this.kernel, n, { toast: true, onClose: close }));
     this.el.append(t);
     while (this.el.children.length > MAX) this.el.firstElementChild.remove();
-    timer = setTimeout(close, SHOW_MS);
+    // Settings › Accessibility › Visual effects: how long notifications stay.
+    timer = setTimeout(close, this.s.settings.get('a11y.notificationSeconds') * 1000);
   }
 
   /** Hides every toast (they stay in the Notification Center). */

@@ -5,6 +5,8 @@ import { h, mount } from '../ui/h.js';
 import { BUILTIN_WALLPAPERS, builtinUrl, paintWallpaper } from './wallpaper.js';
 import { applyTheme } from './theme.js';
 import { spinner } from './boot-screen.js';
+import { icon } from '../ui/icons.js';
+import { openAccessibilityMenu } from './a11y/menu.js';
 
 export const ACCENTS = ['#e8618c', '#f08a4b', '#e6b422', '#4cb782', '#2fa8c9', '#5b7cf0', '#9466e8', '#d45ac8', '#8a8a8a'];
 
@@ -16,7 +18,9 @@ export async function showOobe(layer, { kernel, onDone }) {
   const main = h('div.oobe-main', steps, page, foot);
   const card = h('div.oobe-card', { role: 'dialog', 'aria-label': 'Set up DonutOS' },
     h('div.oobe-art', h('img', { src: 'assets/brand/logo.svg', alt: '' })), main);
-  const el = h('div.screen.oobe', bg, card);
+  // Narrator, Magnifier, the on-screen keyboard… are available during setup too.
+  const tools = h('div.corner-tools', h('button', { type: 'button', title: 'Accessibility', 'aria-label': 'Accessibility', 'aria-haspopup': 'menu', onclick: (e) => openAccessibilityMenu(kernel, e.currentTarget) }, icon('accessibility')));
+  const el = h('div.screen.oobe', bg, card, tools);
   layer.append(el);
   paintWallpaper(bg, 'builtin:glaze', kernel.fs);
 
@@ -26,8 +30,11 @@ export async function showOobe(layer, { kernel, onDone }) {
     theme: 'dark', accent: ACCENTS[0], wallpaper: 'builtin:glaze',
   };
   // Live preview of the chosen look on the setup screen itself.
-  const preview = () => applyTheme({ get: (k) => ({ 'appearance.theme': data.theme, 'appearance.accent': data.accent, 'appearance.transparency': true, 'appearance.animations': true, 'a11y.reduceMotion': false, 'appearance.font': 'system', 'appearance.textScale': 100 })[k] });
+  const look = () => ({ 'appearance.theme': data.theme, 'appearance.accent': data.accent, 'appearance.transparency': true, 'appearance.animations': true, 'a11y.reduceMotion': false, 'appearance.font': 'system', 'appearance.textScale': 100 });
+  // Anything else (the sign-in screen's accessibility choices) comes from the real settings.
+  const preview = () => applyTheme({ get: (k) => (k in look() ? look()[k] : kernel.settings.get(k)) });
   preview();
+  const stopA11yWatch = kernel.settings.watch('a11y.signin', () => setTimeout(preview));
 
   const field = (label, input, hint) => h('div.field', h('label', { for: input.id }, label), input, hint ? h('div.hint', hint) : null);
   const err = h('div.error-text', { role: 'alert' });
@@ -143,7 +150,10 @@ export async function showOobe(layer, { kernel, onDone }) {
     try {
       kernel.settings.set('system.deviceName', data.device.trim());
       const account = await kernel.accounts.create({ name: data.name, password: data.password, pin: data.pin, hint: data.hint });
+      // Accessibility features turned on during setup stay on for the new account.
+      const a11y = Object.fromEntries(Object.entries(kernel.settings.get('a11y.signin')).map(([k, v]) => [`a11y.${k}`, v]));
       await kernel.settings.pokeUser(account.id, {
+        ...a11y,
         'appearance.theme': data.theme, 'appearance.accent': data.accent,
         'appearance.wallpaper': data.wallpaper, 'appearance.lockWallpaper': data.wallpaper,
         'lock.signInWith': data.pin ? 'pin' : 'password',
@@ -151,6 +161,7 @@ export async function showOobe(layer, { kernel, onDone }) {
       kernel.settings.set('system.firstRunDone', true);
       const wait = 1600 - (performance.now() - t0);
       if (wait > 0) await new Promise((r) => setTimeout(r, wait));
+      stopA11yWatch();
       onDone(account);
     } catch (e) {
       err.textContent = e.message;

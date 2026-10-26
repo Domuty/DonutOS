@@ -7,6 +7,9 @@
   "functions": {
     "api/frame-check.js": {
       "maxDuration": 10
+    },
+    "api/relay.js": {
+      "maxDuration": 30
     }
   },
   "headers": [

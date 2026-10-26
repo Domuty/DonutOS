@@ -70,4 +70,4 @@ export default function main(ctx) {
   renderContent();
 }
 
-const SECTION_HOME = { system: 'system', personalization: 'personalization', apps: 'apps', accounts: 'accounts', time: 'datetime', privacy: 'privacy', update: 'update' };
+const SECTION_HOME = { system: 'system', personalization: 'personalization', apps: 'apps', accounts: 'accounts', time: 'datetime', accessibility: 'accessibility', privacy: 'privacy', update: 'update' };

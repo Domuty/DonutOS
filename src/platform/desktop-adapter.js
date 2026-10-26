@@ -100,6 +100,9 @@ export function createDesktopAdapter(native = window.donutNative) {
       clearData: (what) => call('browser:clearData', what || {}),
       // A <webview> is a top-level page of its own, so frame rules don't apply.
       canEmbed: async () => true,
+      relayAvailable: async () => false, // webviews show every site directly
+      // Real key presses into a Browser page (the on-screen keyboard).
+      sendKey: (webContentsId, ev) => call('browser:sendKey', webContentsId, ev),
     },
 
     updates: {

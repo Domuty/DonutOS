@@ -1,6 +1,7 @@
 // Terminal: a shell over the DonutOS file system, with tabs, history, completion,
 // scripts (.dsh) and an isolated JavaScript prompt.
 
+import { createTabStrip, renderTabStrip, tabCloser } from '../common/tabs.js';
 import { h, mount } from '../../ui/h.js';
 import { icon } from '../../ui/icons.js';
 import { Shell } from './shell.js';
@@ -16,7 +17,7 @@ export default function main(ctx) {
   const store = ctx.storage;
   const win = ctx.windows.create({ title: 'Terminal', width: 880, height: 540, minWidth: 380, minHeight: 220, showTitle: false });
   win.body.classList.add('terminal-app');
-  const tabStrip = h('div.ex-tabs.drag', { role: 'tablist', 'aria-label': 'Terminal tabs' });
+  const tabStrip = createTabStrip('Terminal tabs');
   win.titlebar.append(tabStrip);
   const stage = h('div.term-stage');
   mount(win.body, stage);
@@ -50,11 +51,11 @@ export default function main(ctx) {
   }
 
   function renderTabs() {
-    mount(tabStrip, sessions.map((s) => h('div.ex-tab', {
+    renderTabStrip(tabStrip, sessions.map((s) => h('div.ex-tab', {
       role: 'tab', 'aria-selected': String(s === active), class: s === active && 'active', tabindex: '0', title: s.shell.cwd,
       onclick: () => activate(s), onauxclick: (e) => { if (e.button === 1) closeSession(s); },
     }, h('img', { src: 'assets/icons/apps/terminal.svg', alt: '' }), h('span', s.title()),
-      h('button.ex-tab-x', { type: 'button', 'aria-label': 'Close tab', onclick: (e) => { e.stopPropagation(); closeSession(s); } }, icon('close', { size: 10 })))),
+      tabCloser('Close tab', () => closeSession(s)))),
     h('button.ex-tab-new', { type: 'button', title: 'New tab (Ctrl+Shift+T or Alt+T)', 'aria-label': 'New tab', onclick: () => newSession({ cwd: active?.shell.cwd }) }, icon('plus', { size: 14 })));
     if (active) win.setTitle(`${active.title()} — Terminal`);
   }

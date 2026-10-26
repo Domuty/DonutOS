@@ -127,6 +127,28 @@ export const SCHEMA = {
   'a11y.reduceMotion':        { scope: 'user', type: 'boolean', default: false },
   'a11y.cursorSize':          { scope: 'user', type: 'number', default: 1, min: 1, max: 3 },
   'a11y.stickyKeys':          { scope: 'user', type: 'boolean', default: false },
+  'a11y.stickyShortcut':      { scope: 'user', type: 'boolean', default: true },   // Shift five times
+  'a11y.contrastTheme':       { scope: 'user', type: 'string', default: 'night', enum: ['aquatic', 'desert', 'dusk', 'night'] },
+  'a11y.colorFilter':         { scope: 'user', type: 'boolean', default: false },
+  'a11y.colorFilterType':     { scope: 'user', type: 'string', default: 'grayscale', enum: ['grayscale', 'invert', 'grayscaleInvert', 'deuteranopia', 'protanopia', 'tritanopia'] },
+  'a11y.colorFilterShortcut': { scope: 'user', type: 'boolean', default: false },
+  'a11y.magnifierStep':       { scope: 'user', type: 'number', default: 100, enum: [25, 50, 100, 200] },
+  'a11y.narratorKey':         { scope: 'user', type: 'string', default: 'insert', enum: ['insert', 'capslock', 'both'] },
+  'a11y.narratorKeyEcho':     { scope: 'user', type: 'string', default: 'chars', enum: ['none', 'chars', 'words'] },
+  'a11y.narratorHover':       { scope: 'user', type: 'boolean', default: false },
+  'a11y.narratorCaptions':    { scope: 'user', type: 'boolean', default: false },
+  'a11y.cursorColor':         { scope: 'user', type: 'string', default: 'white', enum: ['white', 'black', 'accent'] },
+  'a11y.focusRing':           { scope: 'user', type: 'boolean', default: false },
+  'a11y.alwaysScrollbars':    { scope: 'user', type: 'boolean', default: false },
+  'a11y.notificationSeconds': { scope: 'user', type: 'number', default: 6, enum: [6, 10, 15, 30, 60, 300] },
+  'a11y.flashOnSound':        { scope: 'user', type: 'boolean', default: false },
+  'a11y.bounceKeys':          { scope: 'user', type: 'boolean', default: false },
+  'a11y.bounceMs':            { scope: 'user', type: 'number', default: 500, min: 200, max: 2000 },
+  'a11y.toggleKeys':          { scope: 'user', type: 'boolean', default: false },
+  'a11y.osk':                 { scope: 'user', type: 'boolean', default: false },
+  'a11y.oskTop':              { scope: 'user', type: 'boolean', default: false },
+  // The same features on the lock and sign-in screens, before anyone has signed in.
+  'a11y.signin':              { scope: 'system', type: 'object', default: {} },
 
   // ── Apps & privacy ───────────────────────────────────────────────────
   'apps.defaults':            { scope: 'user', type: 'object', default: {} },

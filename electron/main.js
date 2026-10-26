@@ -3,7 +3,7 @@
 // shell, and implements the native half of the platform adapter over IPC.
 
 'use strict';
-const { app, BrowserWindow, protocol, net, ipcMain, dialog, shell, session } = require('electron');
+const { app, BrowserWindow, protocol, net, ipcMain, dialog, shell, session, webContents } = require('electron');
 const path = require('node:path');
 const fsp = require('node:fs/promises');
 const os = require('node:os');
@@ -133,6 +133,19 @@ function registerIpc() {
     const s = session.fromPartition(BROWSER_PARTITION);
     if (cache) await s.clearCache();
     if (cookies || storage) await s.clearStorageData({ storages: [...(cookies ? ['cookies'] : []), ...(storage ? ['localstorage', 'indexdb', 'serviceworkers', 'cachestorage', 'filesystem', 'websql'] : [])] });
+  });
+  // On-screen keyboard → a Browser page: real key presses, only into DonutOS's own webviews.
+  const KEY_NAMES = { ArrowLeft: 'Left', ArrowRight: 'Right', ArrowUp: 'Up', ArrowDown: 'Down', ' ': 'Space', Escape: 'Escape', Backspace: 'Backspace', Delete: 'Delete', Enter: 'Enter', Tab: 'Tab' };
+  handle('browser:sendKey', (id, { key, mods = {} } = {}) => {
+    const wc = webContents.fromId(Number(id));
+    if (!wc || wc.getType() !== 'webview' || wc.hostWebContents !== win?.webContents) throw Object.assign(new Error('Not a DonutOS browser page'), { code: 'EACCES' });
+    const keyCode = KEY_NAMES[key] || (String(key).length === 1 ? String(key) : null);
+    if (!keyCode) return;
+    const modifiers = [mods.ctrl && 'control', mods.alt && 'alt', mods.shift && 'shift', mods.meta && 'meta'].filter(Boolean);
+    wc.sendInputEvent({ type: 'keyDown', keyCode, modifiers });
+    if (String(key).length === 1 && !mods.ctrl && !mods.alt && !mods.meta) wc.sendInputEvent({ type: 'char', keyCode: key, modifiers });
+    else if (key === 'Enter') wc.sendInputEvent({ type: 'char', keyCode: '\r', modifiers });
+    wc.sendInputEvent({ type: 'keyUp', keyCode, modifiers });
   });
   handle('updates:status', () => updater.status());
   handle('updates:check', () => updater.check());

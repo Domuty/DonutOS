@@ -12,6 +12,13 @@ import { validateManifest } from '../core/registry.js';
 import * as P from '../core/path.js';
 import { sleep } from '../core/util.js';
 import { tokenize, parse, Shell, getopts, ShellSyntaxError } from '../apps/terminal/shell.js';
+import { describe as a11yDescribe } from '../ui/a11y-name.js';
+import { correctionMatrix } from '../shell/a11y/color-filters.js';
+import { a11yGet } from '../shell/a11y/prefs.js';
+import { performKey } from '../shell/a11y/edit-actions.js';
+import { setScreenView, screenToPage, visiblePage } from '../ui/screen.js';
+import { applyTheme } from '../shell/theme.js';
+import { CONTRAST_THEMES } from '../shell/a11y/contrast.js';
 
 globalThis.DONUT_NO_SW = true;
 const platform = createPlatform({ dbName: 'donutos-tests' });
@@ -960,6 +967,87 @@ test('signing out ends the user\'s apps', async () => {
   await kernel.setSessionUser(null);
   assert.equal(kernel.processes.byApp(m.id).length, 0);
   assert.equal(kernel.settings.currentUser, null);
+});
+
+test('accessibility: Narrator names, roles and states', () => {
+  const box = document.createElement('div');
+  box.innerHTML = `<button aria-label="Close">×</button><label class="toggle"><small class="toggle-state">On</small><input type="checkbox" checked><span></span> Wi-Fi</label>
+    <label for="n${RUN}">Name</label><input id="n${RUN}" value="Ana"><a href="#x">Help <img alt="(new)"></a><h2>Title</h2><input type="range" aria-label="Volume" value="40">
+    <button aria-expanded="false" disabled>More</button><select aria-label="Size"><option>Small</option><option selected>Large</option></select><input type="password" aria-label="Password" value="abc">`;
+  document.body.append(box);
+  try {
+    const [btn, , name, link, h2, range, more, size, pw] = [box.querySelector('button'), null, box.querySelector(`#n${RUN}`), box.querySelector('a'), box.querySelector('h2'), box.querySelector('[type=range]'), box.querySelectorAll('button')[1], box.querySelector('select'), box.querySelector('[type=password]')];
+    assert.equal(a11yDescribe(btn), 'Close, button');
+    assert.equal(a11yDescribe(box.querySelector('[type=checkbox]')), 'Wi-Fi, toggle switch, on');
+    assert.equal(a11yDescribe(name), 'Name, Ana, edit');
+    assert.equal(a11yDescribe(link), 'Help (new), link');
+    assert.equal(a11yDescribe(h2), 'Title, heading level 2');
+    assert.equal(a11yDescribe(range), 'Volume, 40, slider');
+    assert.equal(a11yDescribe(more), 'More, button, collapsed, unavailable');
+    assert.equal(a11yDescribe(size), 'Size, Large, combo box');
+    assert.equal(a11yDescribe(pw), 'Password, 3 characters, protected, edit');
+  } finally { box.remove(); }
+});
+
+test('accessibility: colour-blindness filters keep greys grey and change colours', () => {
+  for (const type of ['protanopia', 'deuteranopia', 'tritanopia']) {
+    const m = correctionMatrix(type);
+    for (const row of m) assert.ok(Math.abs(row.reduce((a, b) => a + b, 0) - 1) < 1e-9, `${type}: rows must keep grey`);
+    assert.ok(m.flat().some((v, i) => Math.abs(v - (i % 4 === 0 ? 1 : 0)) > 0.05), `${type} changes colours`);
+  }
+});
+
+test('accessibility: sign-in screen preferences are used when nobody is signed in', () => {
+  const fake = (signin, uid = null) => ({ currentUser: uid, get: (k) => (k === 'a11y.signin' ? signin : k === 'a11y.narrator' ? 'user-value' : undefined) });
+  assert.equal(a11yGet(fake({ narrator: true }), 'narrator'), true);
+  assert.equal(a11yGet(fake({}), 'narrator'), false);
+  assert.equal(a11yGet(fake({}), 'magnifierZoom'), 200);
+  assert.equal(a11yGet(fake({ narrator: true }, 'u1'), 'narrator'), 'user-value');
+  assert.equal(a11yGet({ get: () => undefined }, 'osk'), false); // theme previews' stand-in settings
+});
+
+test('accessibility: keys typed on DonutOS\'s behalf edit text like real keys', async () => {
+  const ta = document.createElement('textarea');
+  document.body.append(ta);
+  try {
+    ta.focus();
+    for (const k of ['h', 'i', 'Enter', 'y', 'o']) await performKey(ta, { key: k, mods: {} });
+    assert.equal(ta.value, 'hi\nyo');
+    await performKey(ta, { key: 'ArrowUp', mods: {} });
+    assert.equal(ta.selectionStart, 2);
+    await performKey(ta, { key: 'Backspace', mods: {} });
+    assert.equal(ta.value, 'h\nyo');
+    await performKey(ta, { key: 'End', mods: { shift: true } });
+    await performKey(ta, { key: 'a', mods: { ctrl: true } });
+    assert.equal([ta.selectionStart, ta.selectionEnd].join(), `0,${ta.value.length}`);
+  } finally { ta.remove(); }
+});
+
+test('accessibility: Magnifier maps the screen to the page around the pointer', () => {
+  try {
+    setScreenView({ z: 2, px: 400, py: 300 });
+    assert.deepEqual(screenToPage(400, 300), { x: 400, y: 300 }); // the point under the pointer stays put
+    assert.deepEqual(screenToPage(600, 500), { x: 500, y: 400 });
+    const v = visiblePage();
+    assert.equal(v.left, 200); assert.equal(v.top, 150);
+    assert.equal(v.right - v.left, innerWidth / 2);
+  } finally { setScreenView({ z: 1, px: 0, py: 0 }); }
+});
+
+test('accessibility: contrast themes replace the colours and turn transparency off', () => {
+  const root = document.createElement('div');
+  const values = { 'appearance.theme': 'light', 'appearance.accent': '#e8618c', 'appearance.transparency': true, 'appearance.animations': true, 'a11y.reduceMotion': false, 'appearance.font': 'system', 'appearance.textScale': 100 };
+  const fake = (hc) => ({ currentUser: 'x', get: (k) => ({ ...values, 'a11y.highContrast': hc, 'a11y.contrastTheme': 'desert', 'a11y.focusRing': false, 'a11y.alwaysScrollbars': true })[k] });
+  applyTheme(fake(true), root);
+  assert.equal(root.dataset.contrast, 'desert');
+  assert.equal(root.dataset.transparency, 'off');
+  assert.equal(root.dataset.scrollbars, 'always');
+  assert.equal(root.style.getPropertyValue('--bg'), CONTRAST_THEMES.desert.bg);
+  applyTheme(fake(false), root);
+  assert.equal(root.dataset.contrast, undefined);
+  assert.equal(root.style.getPropertyValue('--bg'), '');
+  assert.equal(root.style.getPropertyValue('--accent'), '#e8618c');
+  applyTheme(kernel.settings); // put the real theme back
 });
 
 run({
