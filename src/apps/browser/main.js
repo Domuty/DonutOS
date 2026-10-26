@@ -39,13 +39,8 @@ export default function main(ctx) {
   const downloads = new Map(store.get('downloads', []).map((d) => [d.id, d]));
   const engine = () => ENGINES[store.get('engine', DEFAULT_ENGINE)] || ENGINES[DEFAULT_ENGINE];
   // Whether this host has the relay (web version on Vercel or serve.js), and whether it's in use.
-  // How the web version shows websites (desktop webviews always show them directly):
-  //   relay  — through DonutOS's relay where the host has one (default)
-  //   check  — directly where sites allow it; others get "opens in its own tab"
-  //   direct — always directly (for a browser extension that lets every site be framed)
-  const siteMode = () => store.get('siteMode', store.get('relay', true) ? 'relay' : 'check');
   let relayHere = false, relayOn = false;
-  B.relayAvailable().then((ok) => { relayHere = ok; relayOn = ok && siteMode() === 'relay'; }).catch(() => {});
+  B.relayAvailable().then((ok) => { relayHere = ok; relayOn = ok && store.get('relay', true); }).catch(() => {});
   const bookmarks = () => store.get('bookmarks', []);
   const history = () => store.get('history', []);
 
@@ -177,10 +172,9 @@ export default function main(ctx) {
     // Web version: pages come through DonutOS's relay when the host has one (so sites that
     // refuse to be framed still show, and links inside them keep working). Without a relay,
     // sites that refuse get a page of ours instead of an empty frame.
-    const mode = siteMode();
-    const relay = mode === 'relay' && await B.relayAvailable().catch(() => false);
+    const relay = store.get('relay', true) && await B.relayAvailable().catch(() => false);
     if (relay && url.startsWith(ENGINES.duckduckgo[1])) { url = `https://html.duckduckgo.com/html/?q=${url.slice(ENGINES.duckduckgo[1].length)}`; tab.url = url; }
-    const embeddable = relay || mode === 'direct' ? true : await B.canEmbed(url).catch(() => null);
+    const embeddable = relay ? true : await B.canEmbed(url).catch(() => null);
     if (tab.navSeq !== seq) return; // the user went somewhere else meanwhile
     tab.loading = false;
     if (embeddable === false) { showBlocked(tab, url); return; }
@@ -409,17 +403,15 @@ export default function main(ctx) {
       Object.entries(ENGINES).map(([id, [name]]) => h('option', { value: id, selected: store.get('engine', DEFAULT_ENGINE) === id }, name)));
     const home = h('input.input', { value: store.get('home', 'about:newtab'), 'aria-label': 'Home page', onchange: (e) => store.set('home', e.target.value.trim() || 'about:newtab') });
     const bar = h('input', { type: 'checkbox', checked: store.get('showBookmarks', true), onchange: (e) => { store.set('showBookmarks', e.target.checked); renderChrome(); } });
-    const modeSel = h('select.input', { 'aria-label': 'How to show websites', onchange: (e) => { store.set('siteMode', e.target.value); relayOn = relayHere && e.target.value === 'relay'; } },
-      [...(relayHere ? [['relay', 'Through DonutOS’s relay (recommended)']] : []), ['check', 'Directly where sites allow it; others open in a browser tab'], ['direct', 'Always directly (with a browser extension that allows it)']]
-        .map(([v, l]) => h('option', { value: v, selected: (siteMode() === 'relay' && !relayHere ? 'check' : siteMode()) === v }, l)));
+    const relayBox = h('input', { type: 'checkbox', checked: store.get('relay', true), onchange: (e) => { store.set('relay', e.target.checked); relayOn = e.target.checked && relayHere; } });
     const zoom = h('select.input', { 'aria-label': 'Default zoom', onchange: (e) => store.set('zoom', Number(e.target.value)) }, [0.75, 0.9, 1, 1.1, 1.25, 1.5].map((z) => h('option', { value: z, selected: store.get('zoom', 1) === z }, `${Math.round(z * 100)}%`)));
     return h('div.br-page.br-settings', h('h1', 'Browser settings'),
       h('label.ck-field', 'Search engine used in the address bar', sel),
       h('label.ck-field', 'Home page (about:newtab or a web address)', home),
       h('label.ck-field', 'Default page zoom', zoom),
       h('label.wr-check', bar, 'Show the bookmarks bar'),
-      B.kind === 'frame' ? [h('label.ck-field', 'How to show websites', modeSel),
-        h('p.hint', 'Relay: sites that don’t allow being shown inside other apps still open in this window, through the server DonutOS is hosted on (no sign-ins: cookies aren’t kept; some video and interactive sites may not work). Always directly: use this with a browser extension that removes sites’ “don’t show me in a frame” rule — sites then work fully, including signing in.')] : null,
+      relayHere ? [h('label.wr-check', relayBox, 'Show websites through DonutOS’s relay'),
+        h('p.hint', 'Lets sites that don’t allow being shown inside other apps open in this window, and keeps links inside them working. Pages come through the server DonutOS is hosted on; they can’t sign you in (no cookies are kept), and some video and interactive sites may not work. Turn this off to show sites directly where they allow it.')] : null,
       h('h3', 'Clear browsing data'),
       h('div.wr-row',
         h('button.btn', { type: 'button', onclick: () => { store.set('history', []); } }, 'Clear history'),
