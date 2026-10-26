@@ -391,7 +391,7 @@ focus is a timed do-not-disturb.
     - The check refuses private and loopback addresses, follows at most 5 redirects, and never passes page content back.
     - `false` shows a "*site* opens in its own tab" page with **Open in a new tab**. `null` (static hosts without the function, or offline) just tries the frame.
     - Links clicked inside a framed page can't be checked, so a notice covers those.
-    - Google search uses its embeddable mode (`igu=1`); with the relay, DuckDuckGo (the default) uses its plain-HTML results page.
+    - Google (the default) uses its embeddable mode (`igu=1`) and loads straight from the user's browser, because search engines block the relay's server; Browser settings can send it through the relay instead.
     - The desktop build's `<webview>` is a top-level page, so `canEmbed` is always true there.
 - **Mail** (`core/mail.js`): real delivery between this device's accounts (`name@device.local`),
   stored per user in the key-value store so it reaches people who are signed out. Outside
