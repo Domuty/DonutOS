@@ -144,7 +144,8 @@ donutos/
     │   ├── quick-settings.js, notification-center.js (+ calendar), toasts.js  ✅
     │   ├── widgets.js, weather.js (Open-Meteo), run-dialog.js, focus.js  ✅
     │   ├── clipboard-panel.js, emoji-data.js, snip.js            ✅
-    │   └── display-filters.js   ✅ brightness, night light (high contrast & magnifier: 8)
+    │   ├── display-filters.js   ✅ brightness, night light
+    │   └── a11y/                ✅ Magnifier, Narrator, contrast themes, colour filters, pointers, keyboard aids, on-screen keyboard
     ├── wm/
     │   ├── window-manager.js, window.js  ✅ windows, focus, z-order, previews, remembered bounds
     │   ├── snap.js                       ✅ edge/corner snapping, layouts, Snap Assist, groups, shake, Win+Arrow
