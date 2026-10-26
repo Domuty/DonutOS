@@ -4,6 +4,7 @@
 import { createFrameView } from './common/web-view.js';
 import { openDb, req, tx } from './web/idb.js';
 import { IdbFileSystem } from './web/idb-fs.js';
+import { VERSION as APP_VERSION } from '../version.js';
 import {
   batteryStatus, onBatteryChange, browserNetwork, onBrowserNetworkChange,
   LoadMonitor, fullscreenApi, detectOs, detectEngine,
@@ -11,7 +12,6 @@ import {
 
 const DB_NAME = 'donutos';
 const DB_VERSION = 1;
-const APP_VERSION = '0.1.0';
 
 // Most big sites forbid being shown in a frame (X-Frame-Options / CSP frame-ancestors) and the
 // frame then just stays empty. A page can't see another site's headers, so the server that hosts

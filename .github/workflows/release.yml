@@ -1,0 +1,62 @@
+# Builds the DonutOS installers and publishes them on GitHub Releases.
+#
+# Start a release by pushing a version tag:
+#   npm version 1.0.1        (updates package.json and creates the tag v1.0.1)
+#   git push --follow-tags
+# or run it by hand from the Actions tab (Release › Run workflow) for the current version.
+#
+# Installed copies of DonutOS find the new version on their own (Settings › DonutOS Update).
+
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: write   # create the release and upload the installers
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 20, cache: npm }
+      - run: npm ci
+      - run: npm run test:node
+      - name: Core tests inside Electron
+        run: xvfb-run -a npx electron . --tests --no-sandbox
+
+  build:
+    needs: test
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            args: --win --x64 --arm64
+          - os: macos-latest
+            args: --mac --universal
+          - os: ubuntu-latest
+            args: --linux --x64 --arm64
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 20, cache: npm }
+      - run: npm ci
+      - name: Check the tag matches package.json
+        if: startsWith(github.ref, 'refs/tags/v')
+        shell: bash
+        run: |
+          v="$(node -p "require('./package.json').version")"
+          if [ "v$v" != "${GITHUB_REF_NAME}" ]; then echo "Tag ${GITHUB_REF_NAME} doesn't match package.json version $v"; exit 1; fi
+      - run: npm run build:precache
+      - name: Build and publish
+        run: npx electron-builder ${{ matrix.args }} --publish always
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # No Apple Developer certificate: build an unsigned Mac app.
+          CSC_IDENTITY_AUTO_DISCOVERY: 'false'

@@ -312,17 +312,12 @@ app.on('second-instance', () => { if (win) { if (win.isMinimized()) win.restore(
 app.whenReady().then(() => {
   sandbox = new FsSandbox(SANDBOX_ROOT);
   kv = new KvStore(path.join(app.getPath('userData'), 'kv'));
-  updater = createUpdater(send);
+  updater = createUpdater(send, { autoCheck: () => (kv.get('settings:system') || {})['system.updates.auto'] !== false });
   serveSource();
   lockDownSession();
   registerIpc();
   createWindow();
-  if (!TESTS) {
-    setTimeout(() => {
-      const system = kv.get('settings:system') || {};
-      if (system['system.updates.auto'] !== false) updater.check();
-    }, 10_000);
-  }
+  if (!TESTS) updater.start();
 });
 
 app.on('before-quit', () => { allowClose = true; if (kv) kv.flush(); });

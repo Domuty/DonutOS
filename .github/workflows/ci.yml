@@ -1,0 +1,25 @@
+# Runs DonutOS's tests on every push and pull request.
+
+name: Tests
+
+on:
+  push:
+    branches: ['**']
+    tags-ignore: ['v*']
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 20, cache: npm }
+      - run: npm ci
+      - name: Packaging check (catalog and offline file list are up to date)
+        run: |
+          npm run build:precache
+          git diff --exit-code -- src/store/catalog src/precache-manifest.js src/version.js || (echo "Run 'npm run build:precache' and commit the result." && exit 1)
+      - run: npm run test:node
+      - name: Core tests inside Electron
+        run: xvfb-run -a npx electron . --tests --no-sandbox

@@ -98,12 +98,12 @@ export async function showOobe(layer, { kernel, onDone }) {
       lead: 'Pick a look. You can change all of this later in Personalize.',
       body: () => {
         const themes = h('div.choices', { role: 'radiogroup', 'aria-label': 'Theme' }, [['dark', 'Dark', '#2b2431'], ['light', 'Light', '#ffffff']].map(([v, label, pv]) =>
-          h('button.choice', { type: 'button', role: 'radio', 'aria-checked': String(data.theme === v), 'aria-pressed': String(data.theme === v), onclick: () => { data.theme = v; if (v === 'light' && data.wallpaper === 'builtin:glaze') data.wallpaper = 'builtin:mint'; if (v === 'dark' && data.wallpaper === 'builtin:mint') data.wallpaper = 'builtin:glaze'; preview(); render(); } },
+          h('button.choice', { type: 'button', role: 'radio', 'aria-checked': String(data.theme === v), onclick: () => { data.theme = v; if (v === 'light' && data.wallpaper === 'builtin:glaze') data.wallpaper = 'builtin:mint'; if (v === 'dark' && data.wallpaper === 'builtin:mint') data.wallpaper = 'builtin:glaze'; preview(); render(); } },
             h('div.theme-choice', h('div.preview', { style: { backgroundImage: `url(${builtinUrl(v === 'dark' ? 'glaze' : 'mint', true)})`, '--pv-bg': pv } }), label))));
         const swatches = h('div.swatches', { role: 'radiogroup', 'aria-label': 'Accent colour' }, ACCENTS.map((c) =>
-          h('button.swatch', { type: 'button', role: 'radio', 'aria-label': c, 'aria-checked': String(data.accent === c), 'aria-pressed': String(data.accent === c), style: { background: c }, onclick: () => { data.accent = c; preview(); render(); } })));
+          h('button.swatch', { type: 'button', role: 'radio', 'aria-label': c, 'aria-checked': String(data.accent === c), style: { background: c }, onclick: () => { data.accent = c; preview(); render(); } })));
         const walls = h('div.wp-grid', { role: 'radiogroup', 'aria-label': 'Wallpaper' }, BUILTIN_WALLPAPERS.map((w) =>
-          h('button.choice', { type: 'button', role: 'radio', title: w.name, 'aria-label': w.name, 'aria-checked': String(data.wallpaper === w.id), 'aria-pressed': String(data.wallpaper === w.id), onclick: () => { data.wallpaper = w.id; paintWallpaper(bg, w.id, kernel.fs); render(); } },
+          h('button.choice', { type: 'button', role: 'radio', title: w.name, 'aria-label': w.name, 'aria-checked': String(data.wallpaper === w.id), onclick: () => { data.wallpaper = w.id; paintWallpaper(bg, w.id, kernel.fs); render(); } },
             h('img', { src: builtinUrl(w.id.slice(8), true), alt: '' }))));
         return [h('div.label', 'Theme'), themes, h('div.label', 'Accent colour'), swatches, h('div.label', 'Wallpaper'), walls];
       },

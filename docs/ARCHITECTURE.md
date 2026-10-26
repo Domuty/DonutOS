@@ -48,7 +48,7 @@ Everything above it talks to the adapter interface (`src/platform/adapter.js`), 
 
 ## Folder tree
 
-Files marked ✅ exist now (phases 1–8). The rest are created in the phase shown.
+Files marked ✅ exist now (phases 1–9).
 
 ```
 donutos/
@@ -73,7 +73,8 @@ donutos/
 │   ├── build-catalog.js         ✅ src/store/apps/* → src/store/catalog/*.dapp + index.json
 │   └── pack-dapp.js             ✅ packs an app folder into a .dapp (developer CLI)
 ├── .github/workflows/
-│   └── release.yml              9  builds Windows/macOS/Linux installers and publishes a Release
+│   ├── release.yml              ✅ on a v* tag: tests, then Windows/macOS/Linux installers published to GitHub Releases
+│   └── ci.yml                   ✅ tests on every push
 ├── electron/
 │   ├── main.js                  ✅ window, donut:// scheme, IPC, permissions, single instance
 │   ├── preload.js               ✅ the only bridge to the page (allow-listed channels)
@@ -91,6 +92,7 @@ donutos/
     ├── manifest.webmanifest     ✅ PWA install
     ├── sw.js                    ✅ service worker
     ├── precache-manifest.js     ✅ generated
+    ├── version.js               ✅ generated from package.json (shown in Settings, used by the kernel)
     ├── vendor/jszip.min.js      ✅
     ├── assets/
     │   ├── brand/               ✅ logo.svg + PNG icons
@@ -446,6 +448,21 @@ focus is a timed do-not-disturb.
   - The mica offset variables are registered `@property … inherits: false`, so dragging a window doesn't restyle its contents (about 6× less style work per frame).
   - Installed Store apps keep their code under `apps:code:<id>`, loaded when the app starts, so the installed-apps list stays small; older lists are migrated.
   - Opening and closing every app repeatedly leaves DOM nodes and listeners flat.
+
+## Packaging and updates (phase 9)
+
+- **Installers** (electron-builder, `build` in `package.json`):
+  - Windows: one NSIS installer with x64 and ARM64.
+  - macOS: an unsigned universal `.dmg` and `.zip`.
+  - Linux: AppImage and `.deb` for x64 and ARM64; the `.deb` is what Chromebooks install.
+  - Store app sources (`src/store/apps`) aren't packaged; the built catalog is.
+- **Releases** come from `.github/workflows/release.yml` on a `v*` tag: tests first, then one build per OS on GitHub's runners, published with `--publish always` to Domuty/DonutOS Releases. The tag must match `package.json`.
+- **Updates** (`electron/updater.js`, electron-updater):
+  - Checks 10 s after start and every 6 h while Settings › DonutOS Update › automatic updates is on.
+  - Windows, AppImage and `.deb` download in the background and install on restart; this was tested end to end (1.0.0 → 1.0.1 AppImage through a local feed).
+  - macOS can't replace an unsigned app, so it reports `available` and opens the Releases page.
+  - `DONUTOS_UPDATE_URL` points the updater at a generic feed, for testing or self-hosting.
+- **Version:** `scripts/build-precache.js` writes `src/version.js` from `package.json`, so the web version, the desktop app and the installers always agree.
 
 ## Security notes (desktop)
 

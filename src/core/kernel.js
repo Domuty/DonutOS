@@ -17,8 +17,9 @@ import { ClipboardHistory } from './clipboard.js';
 import { PermissionError, ProcessError } from './errors.js';
 import { log } from './log.js';
 import * as P from './path.js';
+import { VERSION } from '../version.js';
 
-export const VERSION = '0.1.0';
+export { VERSION };
 
 export class Kernel {
   constructor({ platform }) {

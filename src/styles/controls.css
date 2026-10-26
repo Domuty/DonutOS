@@ -54,11 +54,11 @@ select.input option { background: var(--surface-solid); color: var(--text); }
 /* Radio-style segmented choices */
 .choices { display: flex; flex-wrap: wrap; gap: 8px; }
 .choice { border: 2px solid transparent; border-radius: var(--radius); padding: 0; background: none; cursor: var(--cur-default, default); position: relative; }
-.choice[aria-pressed="true"] { border-color: var(--accent); }
+.choice[aria-pressed="true"], .choice[aria-checked="true"] { border-color: var(--accent); }
 .choice:hover { filter: brightness(1.05); }
 
 .swatch { width: 32px; height: 32px; border-radius: 50%; border: 2px solid transparent; outline: 2px solid transparent; outline-offset: 1px; }
-.swatch[aria-pressed="true"] { outline-color: var(--text); }
+.swatch[aria-pressed="true"], .swatch[aria-checked="true"] { outline-color: var(--text); }
 
 /* Avatar */
 .avatar { display: inline-grid; place-items: center; border-radius: 50%; overflow: hidden; color: #fff; font-weight: 600; flex: none; background: #6b6475; letter-spacing: .02em; }

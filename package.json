@@ -1,8 +1,8 @@
 {
   "name": "donutos",
   "productName": "DonutOS",
-  "version": "0.1.0",
-  "description": "DonutOS \u2014 a desktop operating system environment for the web and the desktop.",
+  "version": "1.0.0",
+  "description": "DonutOS — a desktop operating system environment for the web and the desktop.",
   "main": "electron/main.js",
   "author": "DonutOS contributors",
   "license": "MIT",
@@ -18,10 +18,11 @@
     "test:node": "node --test tests/node/*.test.js",
     "test:desktop": "electron . --tests",
     "dist": "npm run build:precache && electron-builder",
-    "dist:win": "npm run build:precache && electron-builder --win",
-    "dist:mac": "npm run build:precache && electron-builder --mac",
-    "dist:linux": "npm run build:precache && electron-builder --linux",
-    "pack-dapp": "node scripts/pack-dapp.js"
+    "dist:win": "npm run build:precache && electron-builder --win --x64 --arm64",
+    "dist:mac": "npm run build:precache && electron-builder --mac --universal",
+    "dist:linux": "npm run build:precache && electron-builder --linux --x64 --arm64",
+    "pack-dapp": "node scripts/pack-dapp.js",
+    "release": "npm run build:precache && electron-builder --publish always"
   },
   "devDependencies": {
     "electron": "45.0.0",
@@ -42,41 +43,97 @@
       "electron/**/*",
       "src/**/*",
       "package.json",
-      "!src/tests/**/*"
+      "!src/tests/**/*",
+      "!src/store/apps/**/*"
     ],
     "publish": [
       {
-        "provider": "github"
+        "provider": "github",
+        "owner": "Domuty",
+        "repo": "DonutOS",
+        "releaseType": "release"
       }
     ],
     "win": {
       "target": [
-        "nsis"
+        {
+          "target": "nsis",
+          "arch": [
+            "x64",
+            "arm64"
+          ]
+        }
       ],
-      "icon": "build/icon.png"
+      "icon": "build/icon.png",
+      "artifactName": "DonutOS-Setup-${version}.${ext}"
     },
     "nsis": {
       "oneClick": false,
       "allowToChangeInstallationDirectory": true,
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
-      "shortcutName": "DonutOS"
+      "shortcutName": "DonutOS",
+      "artifactName": "DonutOS-Setup-${version}.${ext}",
+      "uninstallDisplayName": "DonutOS",
+      "deleteAppDataOnUninstall": false
     },
     "mac": {
       "target": [
-        "dmg",
-        "zip"
+        {
+          "target": "dmg",
+          "arch": [
+            "universal"
+          ]
+        },
+        {
+          "target": "zip",
+          "arch": [
+            "universal"
+          ]
+        }
       ],
       "icon": "build/icon.png",
-      "category": "public.app-category.productivity"
+      "category": "public.app-category.productivity",
+      "identity": null,
+      "hardenedRuntime": false,
+      "artifactName": "DonutOS-${version}-mac.${ext}"
     },
     "linux": {
       "target": [
-        "AppImage",
-        "deb"
+        {
+          "target": "AppImage",
+          "arch": [
+            "x64",
+            "arm64"
+          ]
+        },
+        {
+          "target": "deb",
+          "arch": [
+            "x64",
+            "arm64"
+          ]
+        }
       ],
       "icon": "build/icon.png",
-      "category": "Utility"
+      "category": "Utility",
+      "synopsis": "A desktop operating system environment",
+      "maintainer": "DonutOS contributors <noreply@donutos.app>",
+      "artifactName": "DonutOS-${version}-linux-${arch}.${ext}",
+      "syncDesktopName": true
+    },
+    "dmg": {
+      "title": "DonutOS ${version}",
+      "artifactName": "DonutOS-${version}-mac.${ext}"
+    },
+    "deb": {
+      "artifactName": "DonutOS-${version}-linux-${arch}.${ext}"
     }
-  }
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Domuty/DonutOS.git"
+  },
+  "homepage": "https://github.com/Domuty/DonutOS",
+  "desktopName": "donutos.desktop"
 }

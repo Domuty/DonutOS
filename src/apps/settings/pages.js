@@ -485,7 +485,9 @@ const RENDER = {
       const msg = { idle: 'Not checked yet', checking: 'Checking for updates…', available: 'An update is available', downloading: `Downloading${st.progress ? ` (${Math.round(st.progress * 100)}%)` : '…'}`, ready: 'An update is ready', 'up-to-date': 'You’re up to date', error: 'Couldn’t check for updates', unsupported: 'Updates' }[st.state];
       mount(el, h('div.set-hero', icon(st.state === 'ready' ? 'download' : st.state === 'error' ? 'warning' : 'check', { size: 40 }), h('div', h('b', msg), h('small', st.message || `DonutOS ${k.version}`),
         h('div', { style: { display: 'flex', gap: '8px', marginTop: '6px' } },
-          st.state === 'ready' ? h('button.btn.primary', { type: 'button', onclick: () => u.install() }, 'Restart now') : h('button.btn.primary', { type: 'button', disabled: st.state === 'checking' || st.state === 'downloading' || st.state === 'unsupported', onclick: async () => paint(await u.check()) }, 'Check for updates')))),
+          st.state === 'ready' ? h('button.btn.primary', { type: 'button', onclick: () => u.install() }, 'Restart now')
+            : st.state === 'available' ? h('button.btn.primary', { type: 'button', onclick: () => u.install() }, 'Open the download page')
+              : h('button.btn.primary', { type: 'button', disabled: st.state === 'checking' || st.state === 'downloading' || st.state === 'unsupported', onclick: async () => paint(await u.check()) }, 'Check for updates')))),
       h('div.panel', row('restart', 'Get updates automatically', 'Download new versions in the background (for everyone)', toggle(k.settings, 'system.updates.auto'))));
     };
     paint();
